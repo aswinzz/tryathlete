@@ -1,0 +1,117 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #0a0a0a;
+  --surface-1: #141414;
+  --surface-2: #1e1e1e;
+  --surface-3: #282828;
+  --accent: #c8ff00;
+  --accent-dim: rgba(200, 255, 0, 0.12);
+  --text: #ffffff;
+  --text-2: #888888;
+  --text-3: #444444;
+  --zone-1: #4ecdc4;
+  --zone-2: #45b7d1;
+  --zone-3: #9b59b6;
+  --zone-4: #ff6b9d;
+  --zone-5: #ff4757;
+  --border: rgba(255,255,255,0.06);
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-accent: var(--accent);
+  --color-text: var(--text);
+  --color-text-2: var(--text-2);
+  --color-text-3: var(--text-3);
+  --color-zone-1: var(--zone-1);
+  --color-zone-2: var(--zone-2);
+  --color-zone-3: var(--zone-3);
+  --color-zone-4: var(--zone-4);
+  --color-zone-5: var(--zone-5);
+  --font-mono: "Roboto Mono", "Courier New", monospace;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100dvh;
+}
+
+/* Mobile-first max width constraint */
+.app-container {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100dvh;
+  position: relative;
+}
+
+/* Receipt font */
+.font-receipt {
+  font-family: "Courier New", Courier, monospace;
+  letter-spacing: 0.02em;
+}
+
+/* Dashed divider */
+.dash-divider {
+  border: none;
+  border-top: 1px dashed #444;
+  margin: 0;
+}
+
+/* Zone dot */
+.zone-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+/* Jagged receipt edge */
+.receipt-top {
+  position: relative;
+}
+.receipt-top::before {
+  content: "";
+  display: block;
+  height: 8px;
+  background: linear-gradient(135deg, var(--bg) 33.33%, transparent 33.33%)
+      0 0,
+    linear-gradient(-135deg, var(--bg) 33.33%, transparent 33.33%) 0 0;
+  background-size: 12px 8px;
+  background-position: left top;
+}
+.receipt-bottom::after {
+  content: "";
+  display: block;
+  height: 8px;
+  background: linear-gradient(45deg, var(--bg) 33.33%, transparent 33.33%) 0
+      100%,
+    linear-gradient(-45deg, var(--bg) 33.33%, transparent 33.33%) 0 100%;
+  background-size: 12px 8px;
+  background-position: left bottom;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 2px; }
+
+/* Focus ring */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
