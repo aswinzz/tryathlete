@@ -15,6 +15,11 @@ echo ""
 # ── 1. Remove stale git lock ──────────────────────────────────────────────────
 [ -f ".git/index.lock" ] && rm -f .git/index.lock && echo "→ Removed stale git lock"
 
+# ── 1b. Regenerate package-lock.json so it reflects current package.json ──────
+echo "→ Refreshing package-lock.json..."
+rm -f package-lock.json
+npm install --package-lock-only --ignore-scripts 2>/dev/null || true
+
 # ── 2. Initial commit ─────────────────────────────────────────────────────────
 if ! git log --oneline -1 &>/dev/null; then
   echo "→ Creating initial git commit..."
