@@ -13,6 +13,8 @@
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.2",
+    "@ffmpeg/ffmpeg": "^0.12.15",
+    "@ffmpeg/util": "^0.12.2",
     "@prisma/client": "6.19.3",
     "@types/bcryptjs": "^2.4.6",
     "bcryptjs": "^3.0.3",

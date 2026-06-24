@@ -18,6 +18,7 @@ import { AnimatedFlipCard, ANIM_FLIP_DURATION } from "@/components/cards/animate
 import { AnimatedTerminalCard, ANIM_TERMINAL_DURATION } from "@/components/cards/animated/AnimatedTerminalCard";
 import { Button } from "@/components/ui/Button";
 import { Download, Share2, ArrowLeft } from "lucide-react";
+import { toMp4 } from "@/lib/ffmpegConvert";
 import {
   CardConfig,
   DEFAULT_CONFIG,
@@ -93,7 +94,8 @@ export default function SharePage() {
   const router = useRouter();
   const [activity, setActivity] = useState<Activity | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [savingMsg, setSavingMsg] = useState<string | null>(null);
+  const saving = savingMsg !== null;
   const [format, setFormat] = useState<Format>("receipt");
   const [receiptKey, setReceiptKey] = useState(0);
   const [animKey, setAnimKey] = useState(0);
@@ -178,8 +180,10 @@ export default function SharePage() {
     const ctx = rc.getContext("2d")!;
 
     // ── Step 3: MediaRecorder setup ───────────────────────────────────────
+    // Prefer native MP4 (Safari + Chrome 130+); fall back to WebM for older browsers.
     const mimeType =
-      ["video/webm;codecs=vp9", "video/webm", "video/mp4"].find((t) =>
+      ["video/mp4;codecs=h264,aac", "video/mp4", "video/webm;codecs=h264",
+       "video/webm;codecs=vp9", "video/webm"].find((t) =>
         MediaRecorder.isTypeSupported(t)
       ) ?? "video/webm";
 
@@ -309,9 +313,15 @@ export default function SharePage() {
     stream.getTracks().forEach((t) => t.stop());
 
     return new Promise((resolve) => {
-      recorder.onstop = () => {
-        const blob = new Blob(chunks, { type: mimeType });
-        resolve(blob.size > 5000 ? blob : null);
+      recorder.onstop = async () => {
+        const raw = new Blob(chunks, { type: mimeType });
+        if (raw.size <= 5000) { resolve(null); return; }
+        try {
+          setSavingMsg("Converting to MP4…");
+          resolve(await toMp4(raw));
+        } catch {
+          resolve(raw); // fall back to WebM if conversion fails
+        }
       };
     });
   }
@@ -326,7 +336,8 @@ export default function SharePage() {
     if (!canvas) return null;
 
     const mimeType =
-      ["video/webm;codecs=vp9", "video/webm", "video/mp4"].find((t) =>
+      ["video/mp4;codecs=h264,aac", "video/mp4", "video/webm;codecs=h264",
+       "video/webm;codecs=vp9", "video/webm"].find((t) =>
         MediaRecorder.isTypeSupported(t)
       ) ?? "video/webm";
 
@@ -346,9 +357,15 @@ export default function SharePage() {
     stream.getTracks().forEach((t) => t.stop());
 
     return new Promise((resolve) => {
-      recorder.onstop = () => {
-        const blob = new Blob(chunks, { type: mimeType });
-        resolve(blob.size > 5000 ? blob : null);
+      recorder.onstop = async () => {
+        const raw = new Blob(chunks, { type: mimeType });
+        if (raw.size <= 5000) { resolve(null); return; }
+        try {
+          setSavingMsg("Converting to MP4…");
+          resolve(await toMp4(raw));
+        } catch {
+          resolve(raw); // fall back to WebM if conversion fails
+        }
       };
     });
   }
@@ -362,26 +379,24 @@ export default function SharePage() {
   }
 
   async function handleDownload() {
-    setSaving(true);
+    setSavingMsg("Recording…");
     try {
       if (isReceiptAnim) {
         const blob = await captureReceiptVideo();
         if (!blob) return;
-        const ext = blob.type.includes("mp4") ? "mp4" : "webm";
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `tryathlete-receipt-${id}.${ext}`;
+        a.download = `tryathlete-receipt-${id}.mp4`;
         a.click();
         URL.revokeObjectURL(url);
       } else if (isCanvasAnim) {
         const blob = await captureCanvasVideo(animVideoDuration());
         if (!blob) return;
-        const ext = blob.type.includes("mp4") ? "mp4" : "webm";
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = `tryathlete-${format}-${id}.${ext}`;
+        a.download = `tryathlete-${format}-${id}.mp4`;
         a.click();
         URL.revokeObjectURL(url);
       } else {
@@ -395,11 +410,11 @@ export default function SharePage() {
     } catch (e) {
       console.error(e);
     }
-    setSaving(false);
+    setSavingMsg(null);
   }
 
   async function handleShare() {
-    setSaving(true);
+    setSavingMsg("Recording…");
     try {
       const getVideoBlob = async () =>
         isReceiptAnim ? captureReceiptVideo() : captureCanvasVideo(animVideoDuration());
@@ -440,7 +455,7 @@ export default function SharePage() {
     } catch (e) {
       console.error(e);
     }
-    setSaving(false);
+    setSavingMsg(null);
   }
 
   if (loading) {
@@ -770,9 +785,11 @@ export default function SharePage() {
           </Button>
         </div>
         <p className="text-center text-[10px] text-[var(--text-3)] mt-2.5">
-          {isAnimatedFormat
-            ? "Records the animation as a video — tap Share → Instagram Stories"
-            : "Share opens your phone's share sheet → pick Instagram Stories"}
+          {savingMsg
+            ? savingMsg
+            : isAnimatedFormat
+              ? "Records the animation as MP4 — tap Share → Instagram Stories"
+              : "Share opens your phone's share sheet → pick Instagram Stories"}
         </p>
       </div>
     </div>
