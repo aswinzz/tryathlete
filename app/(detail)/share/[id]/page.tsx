@@ -2,6 +2,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { RunReceipt } from "@/components/receipt/RunReceipt";
+import { DarkCard } from "@/components/cards/DarkCard";
+import { StoryCard } from "@/components/cards/StoryCard";
+import { TransparentCard } from "@/components/cards/TransparentCard";
 import { Button } from "@/components/ui/Button";
 import { Download, Share2, ArrowLeft } from "lucide-react";
 
@@ -29,13 +32,23 @@ interface Activity {
   }[];
 }
 
+type Format = "receipt" | "dark" | "story" | "transparent";
+
+const FORMATS: { id: Format; label: string; hint: string; bg: string | null }[] = [
+  { id: "receipt",     label: "Receipt",     hint: "Paper thermal receipt",  bg: "#FAFAF8" },
+  { id: "dark",        label: "Dark",        hint: "App-style dark card",    bg: "#0a0a0a" },
+  { id: "story",       label: "Story",       hint: "9:16 Instagram Story",   bg: "#0a0a0a" },
+  { id: "transparent", label: "Overlay",     hint: "Transparent — place over your photo", bg: null },
+];
+
 export default function SharePage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const [activity, setActivity] = useState<Activity | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const receiptRef = useRef<HTMLDivElement>(null);
+  const [format, setFormat] = useState<Format>("receipt");
+  const cardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetch(`/api/activities/${id}`)
@@ -44,19 +57,24 @@ export default function SharePage() {
       .finally(() => setLoading(false));
   }, [id]);
 
+  const activeFormat = FORMATS.find((f) => f.id === format)!;
+
+  async function captureImage(): Promise<string | null> {
+    if (!cardRef.current) return null;
+    const { toPng } = await import("html-to-image");
+    const opts: Parameters<typeof toPng>[1] = { quality: 1, pixelRatio: 3 };
+    if (activeFormat.bg) opts.backgroundColor = activeFormat.bg;
+    return toPng(cardRef.current, opts);
+  }
+
   async function handleDownload() {
-    if (!receiptRef.current) return;
     setSaving(true);
     try {
-      const { toPng } = await import("html-to-image");
-      const dataUrl = await toPng(receiptRef.current, {
-        quality: 1,
-        pixelRatio: 3,
-        backgroundColor: "#FAFAF8",
-      });
+      const dataUrl = await captureImage();
+      if (!dataUrl) return;
       const a = document.createElement("a");
       a.href = dataUrl;
-      a.download = `tryathlete-receipt-${id}.png`;
+      a.download = `tryathlete-${format}-${id}.png`;
       a.click();
     } catch (e) {
       console.error(e);
@@ -65,28 +83,22 @@ export default function SharePage() {
   }
 
   async function handleShare() {
-    if (!receiptRef.current) return;
     setSaving(true);
     try {
-      const { toPng } = await import("html-to-image");
-      const dataUrl = await toPng(receiptRef.current, {
-        quality: 1,
-        pixelRatio: 3,
-        backgroundColor: "#FAFAF8",
-      });
+      const dataUrl = await captureImage();
+      if (!dataUrl) return;
       const blob = await fetch(dataUrl).then((r) => r.blob());
-      const file = new File([blob], "tryathlete-receipt.png", { type: "image/png" });
+      const file = new File([blob], `tryathlete-${format}.png`, { type: "image/png" });
       if (navigator.share && navigator.canShare({ files: [file] })) {
         await navigator.share({
-          title: `My ${activity?.type || "Workout"} Receipt`,
+          title: `My ${activity?.type || "Workout"}`,
           text: "Check out my workout on TryAthlete!",
           files: [file],
         });
       } else {
-        // Fallback: download
         const a = document.createElement("a");
         a.href = dataUrl;
-        a.download = `tryathlete-receipt-${id}.png`;
+        a.download = `tryathlete-${format}-${id}.png`;
         a.click();
       }
     } catch (e) {
@@ -107,12 +119,26 @@ export default function SharePage() {
     return (
       <div className="flex flex-col items-center justify-center min-h-dvh gap-4">
         <p className="text-[var(--text-2)]">Activity not found</p>
-        <Button variant="surface" onClick={() => router.back()}>
-          Go back
-        </Button>
+        <Button variant="surface" onClick={() => router.back()}>Go back</Button>
       </div>
     );
   }
+
+  const sharedProps = {
+    name: activity.name,
+    type: activity.type,
+    startTime: new Date(activity.startTime),
+    duration: activity.duration,
+    distance: activity.distance,
+    avgHeartRate: activity.avgHeartRate,
+    maxHeartRate: activity.maxHeartRate,
+    avgPace: activity.avgPace,
+    bestPace: activity.bestPace,
+    calories: activity.calories,
+    elevGain: activity.elevGain,
+    steps: activity.steps,
+    laps: activity.laps,
+  };
 
   return (
     <div className="flex flex-col min-h-dvh">
@@ -125,35 +151,85 @@ export default function SharePage() {
           <ArrowLeft size={16} />
           Back
         </button>
-        <h1 className="text-base font-bold text-white">Share Receipt</h1>
+        <h1 className="text-base font-bold text-white">Share</h1>
         <div className="w-16" />
       </div>
 
-      {/* Receipt preview */}
-      <div className="flex-1 overflow-y-auto px-5 pb-4">
-        <RunReceipt
-          receiptRef={receiptRef}
-          name={activity.name}
-          type={activity.type}
-          startTime={new Date(activity.startTime)}
-          duration={activity.duration}
-          distance={activity.distance}
-          avgHeartRate={activity.avgHeartRate}
-          maxHeartRate={activity.maxHeartRate}
-          avgPace={activity.avgPace}
-          bestPace={activity.bestPace}
-          calories={activity.calories}
-          elevGain={activity.elevGain}
-          steps={activity.steps}
-          laps={activity.laps}
-          orderNumber={activity.id.slice(-4).toUpperCase()}
-        />
+      {/* Format picker */}
+      <div className="px-5 mb-4">
+        <div className="flex gap-3 overflow-x-auto pb-1">
+          {FORMATS.map((f) => {
+            const isActive = format === f.id;
+            return (
+              <button
+                key={f.id}
+                onClick={() => setFormat(f.id)}
+                className="flex-shrink-0 flex flex-col items-center gap-1.5"
+              >
+                {/* Swatch */}
+                <div
+                  className="w-14 h-14 rounded-xl flex items-center justify-center transition-all"
+                  style={{
+                    background: f.bg ?? undefined,
+                    backgroundImage: !f.bg
+                      ? "repeating-conic-gradient(#222 0% 25%, #111 0% 50%)"
+                      : undefined,
+                    backgroundSize: !f.bg ? "10px 10px" : undefined,
+                    border: isActive
+                      ? "2px solid var(--accent)"
+                      : "2px solid var(--surface-3)",
+                    boxShadow: isActive ? "0 0 0 1px var(--accent)" : "none",
+                  }}
+                >
+                  <span
+                    className="text-[11px] font-black"
+                    style={{ color: f.bg === "#FAFAF8" ? "#333" : "rgba(255,255,255,0.6)" }}
+                  >
+                    KM
+                  </span>
+                </div>
+                <span
+                  className="text-[10px] font-semibold"
+                  style={{ color: isActive ? "var(--accent)" : "var(--text-3)" }}
+                >
+                  {f.label}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-[10px] text-[var(--text-3)] mt-2 uppercase tracking-widest">
+          {activeFormat.hint}
+        </p>
       </div>
 
-      {/* Format hint */}
-      <p className="text-center text-[10px] text-[var(--text-3)] uppercase tracking-widest pb-4">
-        RECEIPT FORMAT · Tap to preview others
-      </p>
+      {/* Card preview */}
+      <div className="flex-1 overflow-y-auto px-5 pb-4">
+        {format === "receipt" && (
+          <RunReceipt
+            receiptRef={cardRef}
+            orderNumber={activity.id.slice(-4).toUpperCase()}
+            {...sharedProps}
+          />
+        )}
+        {format === "dark" && (
+          <DarkCard cardRef={cardRef} {...sharedProps} />
+        )}
+        {format === "story" && (
+          <StoryCard cardRef={cardRef} {...sharedProps} />
+        )}
+        {format === "transparent" && (
+          <div
+            className="rounded-2xl overflow-hidden"
+            style={{
+              backgroundImage: "repeating-conic-gradient(#1e1e1e 0% 25%, #0a0a0a 0% 50%)",
+              backgroundSize: "14px 14px",
+            }}
+          >
+            <TransparentCard cardRef={cardRef} {...sharedProps} />
+          </div>
+        )}
+      </div>
 
       {/* Action bar */}
       <div className="px-5 pb-10 pt-5 flex gap-3 border-t border-[var(--border)] bg-[var(--bg)]">
@@ -165,9 +241,9 @@ export default function SharePage() {
           onClick={handleShare}
         >
           <Share2 size={15} />
-          Save to Instagram
+          Save
         </Button>
-        <Button
+        {/* <Button
           variant="surface"
           size="lg"
           loading={saving}
@@ -175,7 +251,7 @@ export default function SharePage() {
         >
           <Download size={15} />
           Download
-        </Button>
+        </Button> */}
       </div>
     </div>
   );
