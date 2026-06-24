@@ -12,6 +12,10 @@ import { NightCard } from "@/components/cards/NightCard";
 import { OverlayBarCard } from "@/components/cards/OverlayBarCard";
 import { OverlayBoldCard } from "@/components/cards/OverlayBoldCard";
 import { OverlayPillsCard } from "@/components/cards/OverlayPillsCard";
+import { AnimatedCountCard, ANIM_COUNT_DURATION } from "@/components/cards/animated/AnimatedCountCard";
+import { AnimatedECGCard, ANIM_ECG_DURATION } from "@/components/cards/animated/AnimatedECGCard";
+import { AnimatedFlipCard, ANIM_FLIP_DURATION } from "@/components/cards/animated/AnimatedFlipCard";
+import { AnimatedTerminalCard, ANIM_TERMINAL_DURATION } from "@/components/cards/animated/AnimatedTerminalCard";
 import { Button } from "@/components/ui/Button";
 import { Download, Share2, ArrowLeft } from "lucide-react";
 import {
@@ -50,7 +54,7 @@ interface Activity {
 type Format =
   | "receipt" | "dark" | "neon" | "night" | "story" | "retro" | "minimal"
   | "overlay-clean" | "overlay-bar" | "overlay-bold" | "overlay-pills"
-  | "receipt-anim";
+  | "receipt-anim" | "anim-count" | "anim-ecg" | "anim-flip" | "anim-terminal";
 
 interface FormatDef {
   id: Format;
@@ -73,6 +77,10 @@ const FORMATS: FormatDef[] = [
   { id: "minimal",      label: "Minimal",   hint: "Clean white, modern",            bg: "#ffffff", swatchBg: "#ffffff", swatchText: "#0a0a0a",                 group: "Cards" },
   // — Animated (saves as video) —
   { id: "receipt-anim", label: "Receipt",   hint: "Printer animation · saves as video", bg: "#FAFAF8", swatchBg: "#FAFAF8", swatchText: "#c8ff00",            group: "Animated" },
+  { id: "anim-count",   label: "Odometer",  hint: "Stats count up from zero",           bg: "#0a0a0a", swatchBg: "#0a0a0a", swatchText: "#c8ff00",            group: "Animated" },
+  { id: "anim-ecg",    label: "ECG",       hint: "Heartbeat trace then stats reveal",  bg: "#04090a", swatchBg: "#04090a", swatchText: "#c8ff00",            group: "Animated" },
+  { id: "anim-flip",     label: "Scoreboard", hint: "Split-flap digits flip to your stat",   bg: "#0a0a0a", swatchBg: "#0a0a0a", swatchText: "#c8ff00",   group: "Animated" },
+  { id: "anim-terminal", label: "Terminal",   hint: "Stats type out like a terminal command", bg: "#000d02", swatchBg: "#000d02", swatchText: "#00e040",   group: "Animated" },
   // — Overlays (transparent PNG, place over photos) —
   { id: "overlay-clean", label: "Clean",    hint: "Overlay · centered with shadows",        bg: null, swatchBg: undefined, swatchText: "#fff",     group: "Overlay" },
   { id: "overlay-bar",   label: "Bar",      hint: "Overlay · frosted bar at the bottom",    bg: null, swatchBg: undefined, swatchText: "#fff",     group: "Overlay" },
@@ -88,11 +96,16 @@ export default function SharePage() {
   const [saving, setSaving] = useState(false);
   const [format, setFormat] = useState<Format>("receipt");
   const [receiptKey, setReceiptKey] = useState(0);
+  const [animKey, setAnimKey] = useState(0);
   const [config, setConfig] = useState<CardConfig>(DEFAULT_CONFIG);
   const cardRef = useRef<HTMLDivElement>(null);
+  const animCanvasRef = useRef<HTMLCanvasElement>(null);
+
+  const CANVAS_ANIM_FORMATS: Format[] = ["anim-count", "anim-ecg", "anim-flip", "anim-terminal"];
 
   function handleFormatChange(f: Format) {
     if (f === "receipt-anim") setReceiptKey((k) => k + 1);
+    if (CANVAS_ANIM_FORMATS.includes(f)) setAnimKey((k) => k + 1);
     setFormat(f);
   }
 
@@ -303,12 +316,55 @@ export default function SharePage() {
     });
   }
 
-  const isAnimatedFormat = format === "receipt-anim";
+  const isReceiptAnim = format === "receipt-anim";
+  const isCanvasAnim  = CANVAS_ANIM_FORMATS.includes(format);
+  const isAnimatedFormat = isReceiptAnim || isCanvasAnim;
+
+  /** Record a canvas-based animated card directly from its captureStream */
+  async function captureCanvasVideo(durationMs: number): Promise<Blob | null> {
+    const canvas = animCanvasRef.current;
+    if (!canvas) return null;
+
+    const mimeType =
+      ["video/webm;codecs=vp9", "video/webm", "video/mp4"].find((t) =>
+        MediaRecorder.isTypeSupported(t)
+      ) ?? "video/webm";
+
+    const stream = canvas.captureStream(30);
+    const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8_000_000 });
+    const chunks: Blob[] = [];
+    recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+
+    recorder.start();
+    setAnimKey((k) => k + 1); // restart animation from frame 0
+
+    await new Promise((r) => setTimeout(r, durationMs));
+
+    recorder.requestData();
+    await new Promise((r) => setTimeout(r, 300));
+    recorder.stop();
+    stream.getTracks().forEach((t) => t.stop());
+
+    return new Promise((resolve) => {
+      recorder.onstop = () => {
+        const blob = new Blob(chunks, { type: mimeType });
+        resolve(blob.size > 5000 ? blob : null);
+      };
+    });
+  }
+
+  function animVideoDuration(): number {
+    if (format === "anim-count") return ANIM_COUNT_DURATION + 500;
+    if (format === "anim-ecg")   return ANIM_ECG_DURATION   + 500;
+    if (format === "anim-flip")     return ANIM_FLIP_DURATION     + 500;
+    if (format === "anim-terminal") return ANIM_TERMINAL_DURATION + 500;
+    return 6500;
+  }
 
   async function handleDownload() {
     setSaving(true);
     try {
-      if (isAnimatedFormat) {
+      if (isReceiptAnim) {
         const blob = await captureReceiptVideo();
         if (!blob) return;
         const ext = blob.type.includes("mp4") ? "mp4" : "webm";
@@ -316,6 +372,16 @@ export default function SharePage() {
         const a = document.createElement("a");
         a.href = url;
         a.download = `tryathlete-receipt-${id}.${ext}`;
+        a.click();
+        URL.revokeObjectURL(url);
+      } else if (isCanvasAnim) {
+        const blob = await captureCanvasVideo(animVideoDuration());
+        if (!blob) return;
+        const ext = blob.type.includes("mp4") ? "mp4" : "webm";
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `tryathlete-${format}-${id}.${ext}`;
         a.click();
         URL.revokeObjectURL(url);
       } else {
@@ -335,11 +401,14 @@ export default function SharePage() {
   async function handleShare() {
     setSaving(true);
     try {
+      const getVideoBlob = async () =>
+        isReceiptAnim ? captureReceiptVideo() : captureCanvasVideo(animVideoDuration());
+
       if (isAnimatedFormat) {
-        const blob = await captureReceiptVideo();
+        const blob = await getVideoBlob();
         if (!blob) return;
         const ext = blob.type.includes("mp4") ? "mp4" : "webm";
-        const file = new File([blob], `tryathlete-receipt-${id}.${ext}`, { type: blob.type });
+        const file = new File([blob], `tryathlete-${format}-${id}.${ext}`, { type: blob.type });
         if (navigator.share && navigator.canShare({ files: [file] })) {
           await navigator.share({ title: `My ${activity?.type || "Workout"}`, files: [file] });
         } else {
@@ -454,7 +523,7 @@ export default function SharePage() {
                           boxShadow: isActive ? "0 0 0 1px var(--accent)" : "none",
                         }}
                       >
-                        {f.id === "receipt-anim" ? (
+                        {(f.id === "receipt-anim" || CANVAS_ANIM_FORMATS.includes(f.id as Format)) ? (
                           <span style={{ fontSize: 20, color: f.swatchText ?? "#c8ff00" }}>▶</span>
                         ) : (
                           <span className="text-[11px] font-black" style={{ color: f.swatchText ?? "rgba(255,255,255,0.6)" }}>
@@ -624,6 +693,42 @@ export default function SharePage() {
         {format === "story" && <StoryCard cardRef={cardRef} config={config} {...sharedProps} />}
         {format === "retro" && <RetroCard cardRef={cardRef} config={config} {...sharedProps} />}
         {format === "minimal" && <MinimalCard cardRef={cardRef} config={config} {...sharedProps} />}
+
+        {format === "anim-count" && (
+          <AnimatedCountCard
+            canvasRef={animCanvasRef}
+            animKey={animKey}
+            config={config}
+            {...sharedProps}
+          />
+        )}
+
+        {format === "anim-ecg" && (
+          <AnimatedECGCard
+            canvasRef={animCanvasRef}
+            animKey={animKey}
+            config={config}
+            {...sharedProps}
+          />
+        )}
+
+        {format === "anim-flip" && (
+          <AnimatedFlipCard
+            canvasRef={animCanvasRef}
+            animKey={animKey}
+            config={config}
+            {...sharedProps}
+          />
+        )}
+
+        {format === "anim-terminal" && (
+          <AnimatedTerminalCard
+            canvasRef={animCanvasRef}
+            animKey={animKey}
+            config={config}
+            {...sharedProps}
+          />
+        )}
 
         {/* Overlay variants — checkerboard preview shows transparency */}
         {(format === "overlay-clean" || format === "overlay-bar" || format === "overlay-bold" || format === "overlay-pills") && (
