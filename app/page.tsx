@@ -91,7 +91,7 @@ export default function LandingPage() {
                 Get Started — Free
               </Button>
             </Link>
-            <p className="text-center text-sm text-[var(--text-2)]">
+            <p className="text-center text-sm text-[var(--text-2)] pt-2">
               Already have an account?{" "}
               <Link
                 href="/auth/signin"
