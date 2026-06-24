@@ -57,12 +57,12 @@ export function OverlayBarCard({
         </div>
         {secondaryStats.length > 0 && (
           <>
-            <div style={{ width: 1, alignSelf: "stretch", background: "rgba(255,255,255,0.15)", flexShrink: 0 }} />
-            <div style={{ display: "flex", gap: 16, flex: 1, justifyContent: "flex-end" }}>
-              {secondaryStats.map(({ label, value }) => (
-                <div key={label} style={{ textAlign: "center" }}>
-                  <p style={{ fontFamily: "system-ui, sans-serif", fontSize: 13, fontWeight: 700, color: "#fff", lineHeight: 1, textShadow: SHADOW_SM }}>{value}</p>
-                  <p style={{ fontFamily: "system-ui, sans-serif", fontSize: 9, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.1em", marginTop: 4 }}>{label}</p>
+            <div style={{ width: 1, alignSelf: "stretch", background: "rgba(255,255,255,0.15)", flexShrink: 0, marginRight: 12 }} />
+            <div style={{ display: "flex", flex: 1, justifyContent: "flex-end" }}>
+              {secondaryStats.map(({ label, value }, i) => (
+                <div key={label} style={{ flex: 1, minWidth: 0, textAlign: "center", paddingLeft: i > 0 ? 12 : 0, borderLeft: i > 0 ? "1px solid rgba(255,255,255,0.12)" : "none" }}>
+                  <p style={{ fontFamily: "system-ui, sans-serif", fontSize: 13, fontWeight: 700, color: "#fff", lineHeight: 1, textShadow: SHADOW_SM, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{value}</p>
+                  <p style={{ fontFamily: "system-ui, sans-serif", fontSize: 9, color: "rgba(255,255,255,0.5)", textTransform: "uppercase", letterSpacing: "0.1em", marginTop: 4, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</p>
                 </div>
               ))}
             </div>
