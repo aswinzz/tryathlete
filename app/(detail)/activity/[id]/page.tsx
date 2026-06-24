@@ -108,42 +108,42 @@ export default async function ActivityDetailPage({
   return (
     <div className="flex flex-col min-h-dvh">
       {/* Top bar */}
-      <div className="flex items-center justify-between px-5 pt-14 pb-3">
+      <div className="flex items-center justify-between px-5 pt-14 pb-5">
         <Link
           href="/dashboard"
           className="text-sm font-semibold text-[var(--text-2)] hover:text-white transition-colors"
         >
           ← Feed
         </Link>
-        <button className="text-[var(--text-2)] hover:text-white transition-colors p-1">
+        <button className="text-[var(--text-2)] hover:text-white transition-colors p-2">
           <MoreHorizontal size={20} />
         </button>
       </div>
 
       {/* Sub-header */}
-      <div className="px-5 pb-2">
+      <div className="px-5 pb-3">
         <p className="text-[10px] font-bold text-[var(--text-3)] uppercase tracking-widest">
           {typeLabel}
         </p>
-        <p className="text-xs text-[var(--text-2)] mt-0.5">
+        <p className="text-sm text-[var(--text-2)] mt-1">
           {format(new Date(activity.startTime), "MMMM d, yyyy").toUpperCase()} · OUTDOOR
         </p>
       </div>
 
       {/* Hero stat */}
-      <div className="px-5 pb-5">
+      <div className="px-5 pb-6">
         <div className="flex items-baseline gap-2">
           <span className="text-[72px] font-black leading-none text-white">
             {heroValue}
           </span>
           {heroUnit && (
-            <span className="text-[24px] font-bold text-[var(--text-2)] mb-1">{heroUnit}</span>
+            <span className="text-[26px] font-bold text-[var(--text-2)] mb-1">{heroUnit}</span>
           )}
         </div>
       </div>
 
       {/* Quick stats — 3 columns with vertical dividers */}
-      <div className="mx-5 border-y border-[var(--border)] py-4 mb-5">
+      <div className="mx-5 border-y border-[var(--border)] py-5 mb-6">
         <div className="grid grid-cols-3 divide-x divide-[var(--border)]">
           {quickStats.map(({ label, value }) => (
             <QuickStat key={label} label={label} value={value} />
@@ -180,7 +180,7 @@ export default async function ActivityDetailPage({
                   return (
                     <div
                       key={lap.lapIndex}
-                      className="grid grid-cols-[3fr_2.5fr_1fr_2.5fr_2fr] items-center py-2.5 text-sm"
+                      className="grid grid-cols-[3fr_2.5fr_1fr_2.5fr_2fr] items-center py-4 text-sm"
                     >
                       <span className="font-medium text-white flex items-center gap-1.5">
                         {lapDistanceLabel(lap.distance)}
@@ -209,7 +209,7 @@ export default async function ActivityDetailPage({
               </div>
 
               {/* HR Summary */}
-              <div className="flex items-center justify-between py-3 border-t border-[var(--border)] text-xs mt-1">
+              <div className="flex items-center justify-between py-4 border-t border-[var(--border)] text-xs mt-1">
                 <span className="font-bold text-[var(--text-3)] uppercase tracking-widest text-[9px]">
                   Heart Rate
                 </span>
@@ -237,13 +237,13 @@ export default async function ActivityDetailPage({
         </div>
       )}
 
-      {/* Strength / HIIT — HR zone info instead of splits */}
+      {/* Strength / HIIT — summary rows */}
       {!isEndurance && (
-        <div className="px-5 space-y-4 flex-1">
+        <div className="px-5 space-y-5 flex-1">
           <p className="text-[10px] font-bold text-[var(--text-3)] uppercase tracking-widest">
             Summary
           </p>
-          <div className="space-y-2">
+          <div className="space-y-1">
             {[
               { label: "Duration", value: formatDuration(activity.duration) },
               { label: "Calories", value: activity.calories ? `${activity.calories.toLocaleString()} kcal` : "—" },
@@ -251,9 +251,9 @@ export default async function ActivityDetailPage({
               { label: "Max Heart Rate", value: activity.maxHeartRate ? `${activity.maxHeartRate} bpm` : "—" },
               { label: "Elevation Gain", value: activity.elevGain ? `+${Math.round(activity.elevGain)} m` : "—" },
             ].map(({ label, value }) => (
-              <div key={label} className="flex items-center justify-between py-2 border-b border-[var(--border)]">
-                <span className="text-[12px] text-[var(--text-2)]">{label}</span>
-                <span className="text-[12px] font-semibold text-white">{value}</span>
+              <div key={label} className="flex items-center justify-between py-4 border-b border-[var(--border)]">
+                <span className="text-sm text-[var(--text-2)]">{label}</span>
+                <span className="text-sm font-semibold text-white">{value}</span>
               </div>
             ))}
           </div>
@@ -261,7 +261,7 @@ export default async function ActivityDetailPage({
       )}
 
       {/* Share bar — fixed at bottom */}
-      <div className="sticky bottom-0 px-5 pb-8 pt-4 bg-[var(--bg)] border-t border-[var(--border)]">
+      <div className="sticky bottom-0 px-5 pb-10 pt-5 bg-[var(--bg)] border-t border-[var(--border)]">
         <div className="flex gap-3">
           <Link href={`/share/${activity.id}`} className="flex-1">
             <Button variant="accent" size="lg" fullWidth>
@@ -281,8 +281,8 @@ export default async function ActivityDetailPage({
 function QuickStat({ label, value }: { label: string; value: string }) {
   return (
     <div className="px-4 first:pl-0">
-      <p className="text-[16px] font-bold text-white leading-tight">{value}</p>
-      <p className="text-[9px] font-semibold text-[var(--text-3)] uppercase tracking-widest mt-1">
+      <p className="text-[18px] font-bold text-white leading-tight">{value}</p>
+      <p className="text-[10px] font-semibold text-[var(--text-3)] uppercase tracking-widest mt-1.5">
         {label}
       </p>
     </div>

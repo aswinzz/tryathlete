@@ -4,7 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { ActivityCard } from "@/components/activity/ActivityCard";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
-import { Bell, RefreshCw } from "lucide-react";
+import { Bell } from "lucide-react";
+import { SyncButton } from "@/components/dashboard/SyncButton";
 import Link from "next/link";
 import { formatDuration, getHRZone } from "@/lib/utils";
 import { startOfWeek, endOfWeek, format as dateFmt } from "date-fns";
@@ -52,17 +53,7 @@ export default async function DashboardPage() {
           <h1 className="text-2xl font-bold text-white">{name} 👋</h1>
         </div>
         <div className="flex items-center gap-2">
-          {garminConn && (
-            <form action="/api/garmin/sync" method="POST">
-              <button
-                type="submit"
-                className="w-9 h-9 flex items-center justify-center rounded-full bg-[var(--surface-2)] text-[var(--text-2)] hover:text-[var(--accent)] transition-colors"
-                title="Sync Garmin"
-              >
-                <RefreshCw size={15} />
-              </button>
-            </form>
-          )}
+          {garminConn && <SyncButton />}
           <button className="relative w-9 h-9 flex items-center justify-center rounded-full bg-[var(--surface-2)] text-[var(--text-2)]">
             <Bell size={15} />
             <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#FF9500]" />
@@ -79,22 +70,22 @@ export default async function DashboardPage() {
           <p className="text-[10px] text-[var(--text-3)] mb-3">
             {dateFmt(weekStart, "MMM d")} – {dateFmt(weekEnd, "MMM d")}
           </p>
-          <div className="grid grid-cols-4 gap-2 mb-3">
+          <div className="grid grid-cols-4 gap-2 mb-5">
             {[
               { v: weekStats.runs.toString(), l: "RUNS" },
               { v: `${weekStats.totalKm.toFixed(1)}`, l: "KM" },
               { v: formatDuration(weekStats.totalTime), l: "HRS" },
               { v: weekStats.totalKcal.toLocaleString(), l: "KCAL" },
             ].map(({ v, l }, i) => (
-              <div key={i} className={i > 0 ? "border-l border-[var(--border)] pl-2" : ""}>
-                <p className="text-[20px] font-bold text-white leading-tight">{v}</p>
-                <p className="text-[9px] font-semibold text-[var(--text-2)] uppercase tracking-widest">
+              <div key={i} className={i > 0 ? "border-l border-[var(--border)] pl-3" : ""}>
+                <p className="text-[22px] font-bold text-white leading-tight">{v}</p>
+                <p className="text-[10px] font-semibold text-[var(--text-2)] uppercase tracking-widest mt-1">
                   {l}
                 </p>
               </div>
             ))}
           </div>
-          <p className="text-[9px] text-[var(--text-3)] mb-1.5">Weekly goal: 30 KM</p>
+          <p className="text-[10px] text-[var(--text-3)] mb-2">Weekly goal: 30 KM</p>
           {/* Progress bar */}
           <div className="h-1 rounded-full bg-[var(--surface-3)] overflow-hidden">
             <div
@@ -129,9 +120,9 @@ export default async function DashboardPage() {
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-base font-bold text-white">Recent Activity</h2>
-            <button className="text-xs text-[var(--text-2)] hover:text-white transition-colors">
+            <Link href="/activity" className="text-xs text-[var(--text-2)] hover:text-white transition-colors">
               See all →
-            </button>
+            </Link>
           </div>
 
           <div className="space-y-3">

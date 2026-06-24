@@ -117,20 +117,20 @@ export default function SharePage() {
   return (
     <div className="flex flex-col min-h-dvh">
       {/* Top bar */}
-      <div className="flex items-center justify-between px-5 pt-14 pb-4">
+      <div className="flex items-center justify-between px-5 pt-14 pb-5">
         <button
           onClick={() => router.back()}
-          className="text-sm font-semibold text-[var(--text-2)] hover:text-white transition-colors flex items-center gap-1"
+          className="text-sm font-semibold text-[var(--text-2)] hover:text-white transition-colors flex items-center gap-1.5"
         >
           <ArrowLeft size={16} />
           Back
         </button>
-        <h1 className="text-base font-bold text-white">Share Run</h1>
+        <h1 className="text-base font-bold text-white">Share Receipt</h1>
         <div className="w-16" />
       </div>
 
       {/* Receipt preview */}
-      <div className="flex-1 overflow-y-auto px-4 pb-4">
+      <div className="flex-1 overflow-y-auto px-5 pb-4">
         <RunReceipt
           receiptRef={receiptRef}
           name={activity.name}
@@ -151,12 +151,12 @@ export default function SharePage() {
       </div>
 
       {/* Format hint */}
-      <p className="text-center text-[10px] text-[var(--text-3)] uppercase tracking-widest pb-3">
+      <p className="text-center text-[10px] text-[var(--text-3)] uppercase tracking-widest pb-4">
         RECEIPT FORMAT · Tap to preview others
       </p>
 
       {/* Action bar */}
-      <div className="px-5 pb-8 pt-3 flex gap-3 border-t border-[var(--border)] bg-[var(--bg)]">
+      <div className="px-5 pb-10 pt-5 flex gap-3 border-t border-[var(--border)] bg-[var(--bg)]">
         <Button
           variant="accent"
           size="lg"

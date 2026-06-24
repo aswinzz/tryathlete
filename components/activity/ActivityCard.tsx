@@ -84,9 +84,9 @@ export function ActivityCard({
         style={{ background: zoneColor }}
       />
 
-      <div className="pl-4 pr-4 py-4">
+      <div className="pl-5 pr-5 pt-5 pb-5">
         {/* Header row */}
-        <div className="flex items-start justify-between mb-3">
+        <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3">
             {/* Icon */}
             <div
@@ -97,17 +97,17 @@ export function ActivityCard({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <p className="font-semibold text-[var(--text)] text-[14px]">{name}</p>
+                <p className="font-semibold text-[var(--text)] text-[15px]">{name}</p>
                 {isPR && <Badge variant="accent">PR</Badge>}
               </div>
-              <p className="text-xs text-[var(--text-2)] mt-0.5">
+              <p className="text-xs text-[var(--text-2)] mt-1">
                 {format(new Date(startTime), "MMM d · h:mm a")}
               </p>
             </div>
           </div>
           <Link
             href={`/share/${id}`}
-            className="text-[var(--text-3)] hover:text-[var(--accent)] transition-colors p-1"
+            className="text-[var(--text-3)] hover:text-[var(--accent)] transition-colors p-1.5"
             title="Share"
           >
             <Share2 size={16} />
@@ -116,8 +116,14 @@ export function ActivityCard({
 
         {/* Stats row */}
         {stats.length > 0 && (
-          <div className="border-t border-[var(--border)] pt-3">
-            <div className={cn("grid gap-2", `grid-cols-${Math.min(stats.length, 4)}`)}>
+          <div className="border-t border-[var(--border)] pt-4">
+            <div className={cn(
+              "grid gap-4",
+              stats.length === 1 && "grid-cols-1",
+              stats.length === 2 && "grid-cols-2",
+              stats.length === 3 && "grid-cols-3",
+              stats.length >= 4 && "grid-cols-4",
+            )}>
               {stats.slice(0, 4).map(({ label, value }, i) => (
                 <Stat key={i} label={label} value={value} />
               ))}
@@ -135,8 +141,8 @@ export function ActivityCard({
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-[11px] font-semibold text-[var(--text)] truncate leading-tight">{value}</p>
-      <p className="text-[9px] text-[var(--text-2)] mt-0.5 uppercase tracking-wider">{label}</p>
+      <p className="text-[13px] font-bold text-[var(--text)] truncate leading-tight">{value}</p>
+      <p className="text-[10px] text-[var(--text-3)] mt-1 uppercase tracking-wider">{label}</p>
     </div>
   );
 }

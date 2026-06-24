@@ -52,8 +52,8 @@ export async function POST(
     let laps: GarminLap[] = [];
 
     const endpoints = [
-      `https://connect.garmin.com/activity-service/activity/${activity.garminId}/splits`,
-      `https://connect.garmin.com/activity-service/activity/${activity.garminId}/laps`,
+      `https://connectapi.garmin.com/activity-service/activity/${activity.garminId}/splits`,
+      `https://connectapi.garmin.com/activity-service/activity/${activity.garminId}/laps`,
     ];
 
     for (const url of endpoints) {

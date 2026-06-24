@@ -31,20 +31,20 @@ export default function SignInPage() {
   }
 
   return (
-    <main className="flex flex-col min-h-dvh px-5 pt-16 pb-10">
+    <main className="flex flex-col min-h-dvh px-6 pt-14 pb-10">
       <Link
         href="/"
-        className="text-sm text-[var(--text-2)] mb-10 inline-block hover:text-white transition-colors"
+        className="text-sm text-[var(--text-2)] mb-12 inline-block hover:text-white transition-colors"
       >
         ← Back
       </Link>
 
-      <div className="mb-8">
+      <div className="mb-10">
         <h1 className="text-3xl font-black text-white">Welcome back.</h1>
-        <p className="text-sm text-[var(--text-2)] mt-1">Sign in to your account</p>
+        <p className="text-sm text-[var(--text-2)] mt-2">Sign in to your account</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4 flex-1">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-5 flex-1">
         <Input
           label="Email"
           type="email"
@@ -65,20 +65,20 @@ export default function SignInPage() {
           error={error}
         />
 
-        <Button type="submit" variant="accent" size="lg" fullWidth loading={loading} className="mt-2">
+        <Button type="submit" variant="accent" size="lg" fullWidth loading={loading} className="mt-4">
           Sign In
         </Button>
-      </form>
 
-      <p className="text-center text-sm text-[var(--text-2)] mt-8">
-        Don&apos;t have an account?{" "}
-        <Link
-          href="/auth/signup"
-          className="text-white font-semibold hover:text-[var(--accent)] transition-colors"
-        >
-          Sign up
-        </Link>
-      </p>
+        <p className="mt-auto text-center text-sm text-[var(--text-2)]">
+          Don&apos;t have an account?{" "}
+          <Link
+            href="/auth/signup"
+            className="text-white font-semibold hover:text-[var(--accent)] transition-colors"
+          >
+            Sign up
+          </Link>
+        </p>
+      </form>
     </main>
   );
 }

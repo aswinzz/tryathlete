@@ -216,6 +216,7 @@ export function RunReceipt({
             <DashLine style={{ marginTop: 4 }} />
             <p style={{ ...MONO, fontWeight: 700, fontSize: 9, color: "#888", textAlign: "center", marginTop: 12 }}>*** DUPLICATE COPY ***</p>
             <p style={{ ...MONO, fontSize: 8, color: "#aaa", textAlign: "center", marginTop: 4 }}>KEEP FOR YOUR RECORDS</p>
+            {/* Branding — commented out for now
             <p style={{ ...MONO, fontSize: 7, color: "#bbb", textAlign: "center", marginTop: 8, lineHeight: 1.6 }}>
               Every run leaves a trace. TryAthlete turns it into<br />
               something you can keep and share.
@@ -223,6 +224,7 @@ export function RunReceipt({
             <p style={{ ...MONO, fontWeight: 700, fontSize: 9, color: "#555", textAlign: "center", marginTop: 12 }}>
               🏃 TryAthlete · tryathlete.app
             </p>
+            */}
           </div>
 
           {/* Jagged bottom */}

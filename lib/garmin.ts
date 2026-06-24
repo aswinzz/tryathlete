@@ -35,9 +35,35 @@ interface GarminSplitsResponse {
 
 export async function syncGarminActivities(userId: string) {
   const client = await getGarminClient(userId);
-  const activities = await client.getActivities(0, 20);
 
-  for (const act of activities) {
+  // Paginate through all Garmin history (newest first).
+  // Stop early once we hit a page where every activity already exists in DB
+  // (meaning we've caught up with previously synced data).
+  const PAGE_SIZE = 100;
+  const MAX_ACTIVITIES = 1000; // safety cap
+  let start = 0;
+  let allActivities: Awaited<ReturnType<typeof client.getActivities>> = [];
+
+  while (start < MAX_ACTIVITIES) {
+    const page = await client.getActivities(start, PAGE_SIZE);
+    if (!page || page.length === 0) break;
+
+    // Check if every activity on this page is already in the DB
+    const garminIds = page.map((a) => String(a.activityId));
+    const existingCount = await prisma.activity.count({
+      where: { garminId: { in: garminIds } },
+    });
+    const allExist = existingCount === page.length;
+
+    allActivities = allActivities.concat(page);
+    start += page.length;
+
+    // If the whole page is already in DB and we have some data, we're caught up
+    if (allExist && start > PAGE_SIZE) break;
+    if (page.length < PAGE_SIZE) break; // Last page
+  }
+
+  for (const act of allActivities) {
     const garminId = String(act.activityId);
 
     const existing = await prisma.activity.findUnique({ where: { garminId } });
@@ -67,7 +93,7 @@ export async function syncGarminActivities(userId: string) {
 
     // Fetch per-km splits via raw API endpoint
     try {
-      const splitsUrl = `https://connect.garmin.com/activity-service/activity/${act.activityId}/splits`;
+      const splitsUrl = `https://connectapi.garmin.com/activity-service/activity/${act.activityId}/splits`;
       const splitsData = await client.get<GarminSplitsResponse>(splitsUrl);
       const laps: GarminSplit[] = splitsData?.lapDTOs || [];
 

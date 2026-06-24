@@ -21,34 +21,34 @@ export default function LandingPage() {
         7
       </div>
 
-      <div className="relative z-10 flex flex-col flex-1">
-        {/* Wordmark */}
-        <div className="mb-2">
-          <h1 className="text-[52px] font-black leading-none tracking-tight text-white">
-            TRY
-          </h1>
-          <h1
-            className="text-[52px] font-black leading-none tracking-tight"
-            style={{ color: "var(--accent)" }}
-          >
-            ATHLETE
-          </h1>
+      <div className="relative z-10 flex flex-col flex-1 justify-between gap-6">
+        {/* Top: Wordmark + tagline */}
+        <div>
+          <div className="mb-4">
+            <h1 className="text-[52px] font-black leading-none tracking-tight text-white">
+              TRY
+            </h1>
+            <h1
+              className="text-[52px] font-black leading-none tracking-tight"
+              style={{ color: "var(--accent)" }}
+            >
+              ATHLETE
+            </h1>
+          </div>
+          <p className="text-3xl font-bold text-white leading-snug mb-3">
+            Make every workout
+            <br />
+            instagrammable.
+          </p>
+          <p className="text-sm text-[var(--text-2)] leading-relaxed">
+            Connect Garmin, Apple Watch, COROS or Whoop.
+            <br />
+            Turn your data into stunning shareable receipts.
+          </p>
         </div>
 
-        {/* Tagline */}
-        <p className="text-3xl font-bold text-white leading-snug mb-3">
-          Make every workout
-          <br />
-          instagrammable.
-        </p>
-        <p className="text-sm text-[var(--text-2)] leading-relaxed mb-8">
-          Connect Garmin, Apple Watch, COROS or Whoop.
-          <br />
-          Turn your data into stunning shareable receipts.
-        </p>
-
-        {/* Preview Card */}
-        <div className="bg-[var(--surface-2)] rounded-2xl overflow-hidden mb-8">
+        {/* Middle: Preview Card */}
+        <div className="bg-[var(--surface-2)] rounded-2xl overflow-hidden">
           <div
             className="h-[3px]"
             style={{ background: "var(--accent)" }}
@@ -65,7 +65,7 @@ export default function LandingPage() {
               className="mb-3"
               style={{ borderTop: "1px solid var(--border)" }}
             />
-            <div className="space-y-2">
+            <div className="space-y-3">
               {PREVIEW_LAPS.map((lap) => (
                 <div key={lap.km} className="flex items-center gap-3 text-xs">
                   <span className="text-[var(--text-2)] w-10">{lap.km}</span>
@@ -83,38 +83,39 @@ export default function LandingPage() {
           </div>
         </div>
 
-        {/* CTA */}
-        <div className="space-y-3 mt-auto">
-          <Link href="/auth/signup">
-            <Button variant="accent" size="lg" fullWidth>
-              Get Started — Free
-            </Button>
-          </Link>
-          <p className="text-center text-sm text-[var(--text-2)]">
-            Already have an account?{" "}
-            <Link
-              href="/auth/signin"
-              className="text-white font-semibold hover:text-[var(--accent)] transition-colors"
-            >
-              Sign in
+        {/* Bottom: CTA + chips */}
+        <div className="space-y-5">
+          <div className="space-y-3">
+            <Link href="/auth/signup">
+              <Button variant="accent" size="lg" fullWidth>
+                Get Started — Free
+              </Button>
             </Link>
-          </p>
-        </div>
-
-        {/* Tracker chips */}
-        <div className="mt-8">
-          <p className="text-[10px] font-bold text-[var(--text-3)] uppercase tracking-widest mb-3">
-            Works with
-          </p>
-          <div className="flex gap-2 flex-wrap">
-            {TRACKERS.map((t) => (
-              <span
-                key={t}
-                className="text-[9px] font-bold text-[var(--text-2)] bg-[var(--surface-2)] px-3 py-1 rounded-full uppercase tracking-wider"
+            <p className="text-center text-sm text-[var(--text-2)]">
+              Already have an account?{" "}
+              <Link
+                href="/auth/signin"
+                className="text-white font-semibold hover:text-[var(--accent)] transition-colors"
               >
-                {t}
-              </span>
-            ))}
+                Sign in
+              </Link>
+            </p>
+          </div>
+
+          <div>
+            <p className="text-[10px] font-bold text-[var(--text-3)] uppercase tracking-widest mb-3">
+              Works with
+            </p>
+            <div className="flex gap-2 flex-wrap">
+              {TRACKERS.map((t) => (
+                <span
+                  key={t}
+                  className="text-[9px] font-bold text-[var(--text-2)] bg-[var(--surface-2)] px-3 py-1.5 rounded-full uppercase tracking-wider"
+                >
+                  {t}
+                </span>
+              ))}
+            </div>
           </div>
         </div>
       </div>
