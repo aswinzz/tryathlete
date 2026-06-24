@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Bell, RefreshCw } from "lucide-react";
 import Link from "next/link";
 import { formatDuration, getHRZone } from "@/lib/utils";
-import { startOfWeek, endOfWeek } from "date-fns";
+import { startOfWeek, endOfWeek, format as dateFmt } from "date-fns";
 
 export const dynamic = "force-dynamic";
 
@@ -44,7 +44,7 @@ export default async function DashboardPage() {
   const name = session?.user?.name?.split(" ")[0] || "Athlete";
 
   return (
-    <div className="px-5 pt-14 pb-4 space-y-6">
+    <div className="px-5 pt-14 pb-28 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -65,35 +65,36 @@ export default async function DashboardPage() {
           )}
           <button className="relative w-9 h-9 flex items-center justify-center rounded-full bg-[var(--surface-2)] text-[var(--text-2)]">
             <Bell size={15} />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[var(--zone-5)]" />
+            <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#FF9500]" />
           </button>
         </div>
       </div>
 
       {/* Weekly summary */}
       <Card accentTop>
-        <CardContent>
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-[10px] font-bold text-[var(--text-2)] uppercase tracking-widest">
-              This Week
-            </p>
-            <p className="text-[10px] text-[var(--text-3)]">Goal: 30 km</p>
-          </div>
-          <div className="grid grid-cols-4 gap-2 mb-4">
+        <CardContent className="p-5">
+          <p className="text-[10px] font-semibold text-[var(--text-2)] uppercase tracking-widest mb-1">
+            This Week
+          </p>
+          <p className="text-[10px] text-[var(--text-3)] mb-3">
+            {dateFmt(weekStart, "MMM d")} – {dateFmt(weekEnd, "MMM d")}
+          </p>
+          <div className="grid grid-cols-4 gap-2 mb-3">
             {[
-              { v: weekStats.runs.toString(), l: "Runs" },
+              { v: weekStats.runs.toString(), l: "RUNS" },
               { v: `${weekStats.totalKm.toFixed(1)}`, l: "KM" },
-              { v: formatDuration(weekStats.totalTime), l: "Time" },
-              { v: weekStats.totalKcal.toLocaleString(), l: "Kcal" },
+              { v: formatDuration(weekStats.totalTime), l: "HRS" },
+              { v: weekStats.totalKcal.toLocaleString(), l: "KCAL" },
             ].map(({ v, l }, i) => (
               <div key={i} className={i > 0 ? "border-l border-[var(--border)] pl-2" : ""}>
-                <p className="text-xl font-bold text-white">{v}</p>
-                <p className="text-[9px] font-bold text-[var(--text-2)] uppercase tracking-widest">
+                <p className="text-[20px] font-bold text-white leading-tight">{v}</p>
+                <p className="text-[9px] font-semibold text-[var(--text-2)] uppercase tracking-widest">
                   {l}
                 </p>
               </div>
             ))}
           </div>
+          <p className="text-[9px] text-[var(--text-3)] mb-1.5">Weekly goal: 30 KM</p>
           {/* Progress bar */}
           <div className="h-1 rounded-full bg-[var(--surface-3)] overflow-hidden">
             <div
@@ -147,6 +148,8 @@ export default async function DashboardPage() {
                   distance={act.distance}
                   avgHeartRate={act.avgHeartRate}
                   avgPace={act.avgPace}
+                  elevGain={act.elevGain}
+                  calories={act.calories}
                   zone={zone}
                 />
               );

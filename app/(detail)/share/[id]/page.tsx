@@ -150,27 +150,31 @@ export default function SharePage() {
         />
       </div>
 
+      {/* Format hint */}
+      <p className="text-center text-[10px] text-[var(--text-3)] uppercase tracking-widest pb-3">
+        RECEIPT FORMAT · Tap to preview others
+      </p>
+
       {/* Action bar */}
-      <div className="px-5 pb-8 pt-4 space-y-3 border-t border-[var(--border)] bg-[var(--surface-1)]">
+      <div className="px-5 pb-8 pt-3 flex gap-3 border-t border-[var(--border)] bg-[var(--bg)]">
         <Button
           variant="accent"
           size="lg"
-          fullWidth
+          className="flex-1"
           loading={saving}
           onClick={handleShare}
         >
-          <Share2 size={16} />
-          Share to Instagram
+          <Share2 size={15} />
+          Save to Instagram
         </Button>
         <Button
           variant="surface"
           size="lg"
-          fullWidth
           loading={saving}
           onClick={handleDownload}
         >
-          <Download size={16} />
-          Download Image
+          <Download size={15} />
+          Download
         </Button>
       </div>
     </div>

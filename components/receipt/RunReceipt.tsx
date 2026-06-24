@@ -3,6 +3,10 @@ import {
   formatPace,
   formatDuration,
   formatDistance,
+  formatSpeed,
+  formatPace100m,
+  getActivityCategory,
+  getActivityTypeLabel,
   ZONE_COLORS,
   lapDistanceLabel,
 } from "@/lib/utils";
@@ -35,9 +39,10 @@ interface RunReceiptProps {
   orderNumber?: string;
 }
 
+const MONO: React.CSSProperties = { fontFamily: "Roboto Mono, Courier New, monospace" };
+
 export function RunReceipt({
   receiptRef,
-  name,
   type,
   startTime,
   duration,
@@ -52,196 +57,195 @@ export function RunReceipt({
   laps = [],
   orderNumber = "0001",
 }: RunReceiptProps) {
-  const bestLapPace = laps.length
-    ? laps.reduce((best, l) => (!best || (l.avgPace && l.avgPace < best) ? l.avgPace! : best), 0)
-    : null;
+  const category = getActivityCategory(type);
+  const t = type.toLowerCase();
+  const isRun = t.includes("run");
+  const isCycle = t.includes("cycl") || t.includes("bike") || t.includes("ride");
+  const isSwim = t.includes("swim");
+  const isEndurance = category === "endurance";
 
-  const fastestLapIndex = laps.length
-    ? laps.reduce((bi, l, i, arr) => (l.avgPace && (!arr[bi].avgPace || l.avgPace < arr[bi].avgPace!) ? i : bi), 0)
-    : -1;
+  const typeLabel = getActivityTypeLabel(type).toUpperCase();
+  const dateStr = format(new Date(startTime), "MMMM d, yyyy").toUpperCase();
+  const workoutLine = isRun
+    ? "OUTDOOR  —  EASY"
+    : isCycle
+      ? "OUTDOOR  —  CYCLING"
+      : isSwim
+        ? "POOL  —  FREESTYLE"
+        : "STRENGTH  —  INDOOR";
+
+  const fastestLap = laps.reduce(
+    (best: Lap | null, l) =>
+      !best || (l.avgPace && (!best.avgPace || l.avgPace < best.avgPace)) ? l : best,
+    null
+  );
+
+  const best1kPace = fastestLap?.avgPace
+    ? isSwim
+      ? `${formatPace100m(fastestLap.avgPace)}/100M`
+      : isCycle
+        ? `${formatSpeed(1 / fastestLap.avgPace)} KM/H`
+        : `${formatPace(fastestLap.avgPace)}/KM`
+    : bestPace
+      ? `${formatPace(bestPace)}/KM`
+      : null;
 
   const hrValues = laps.map((l) => l.avgHeartRate).filter(Boolean) as number[];
   const minHR = hrValues.length ? Math.min(...hrValues) : avgHeartRate;
-  const maxHR = hrValues.length ? Math.max(...hrValues) : maxHeartRate;
+  const maxHRVal = hrValues.length ? Math.max(...hrValues) : maxHeartRate;
+  const maxBarH = Math.max(...hrValues, 1);
+
+  // Build summary rows
+  const summaryRows: { label: string; value: string }[] = [];
+  if (isEndurance && distance) {
+    summaryRows.push({ label: "TOTAL", value: isSwim ? `${Math.round(distance)} M` : `${formatDistance(distance)} KM` });
+  }
+  summaryRows.push({ label: "DURATION", value: formatDuration(duration) });
+  if (avgPace && isEndurance) {
+    summaryRows.push({
+      label: isSwim ? "AVG PACE/100M" : isCycle ? "AVG SPEED" : "AVG PACE",
+      value: isSwim ? `${formatPace100m(avgPace)}/100M` : isCycle ? `${formatSpeed(1 / avgPace)} KM/H` : `${formatPace(avgPace)}/KM`,
+    });
+  }
+  if (best1kPace && isRun) summaryRows.push({ label: "BEST 1K", value: best1kPace });
+  if (steps) summaryRows.push({ label: "EST. STEPS", value: steps.toLocaleString() });
+  if (calories) summaryRows.push({ label: "CALORIES", value: `${calories.toLocaleString()} KCAL` });
+  if (elevGain) summaryRows.push({ label: "ELEVATION", value: `+${Math.round(elevGain)}M` });
+  if (!isEndurance) {
+    if (avgHeartRate) summaryRows.push({ label: "AVG HR", value: `${avgHeartRate} BPM` });
+    if (maxHeartRate) summaryRows.push({ label: "MAX HR", value: `${maxHeartRate} BPM` });
+  }
+
+  const paceColLabel = isSwim ? "PACE/100" : isCycle ? "SPEED" : "PACE";
 
   return (
-    <div className="px-1">
-      {/* Receipt wrapper */}
-      <div
-        ref={receiptRef}
-        id="run-receipt"
-        className="bg-[#FAFAF8] text-[#111] font-receipt receipt-top receipt-bottom shadow-2xl"
-        style={{ fontFamily: "'Courier New', Courier, monospace" }}
-      >
-        <div className="px-6 py-6">
-          {/* Header */}
-          <div className="text-center mb-4">
-            <div className="text-3xl mb-2">🏃</div>
-            <h1 className="text-lg font-black tracking-widest uppercase">Run Receipt</h1>
-            <p className="text-xs text-[#555] mt-2 uppercase tracking-wider">
-              Order:#{orderNumber.padStart(4, "0")}
-            </p>
-            <p className="text-xs text-[#555] uppercase tracking-wider">
-              {format(new Date(startTime), "MMMM d, yyyy")}
-            </p>
-            <p className="text-xs text-[#555] uppercase tracking-wider">
-              {type.toUpperCase()} — {name.toUpperCase()}
-            </p>
-          </div>
+    <div style={{ padding: "0 4px" }}>
+      {/* Shadow */}
+      <div style={{ position: "relative" }}>
+        <div style={{ position: "absolute", inset: 0, transform: "translate(4px,4px)", borderRadius: 4, background: "rgba(0,0,0,0.5)" }} />
 
-          <DashLine />
+        {/* Paper */}
+        <div
+          ref={receiptRef}
+          id="run-receipt"
+          style={{ position: "relative", background: "#FAFAF8", borderRadius: 4, overflow: "hidden" }}
+        >
+          {/* Jagged top */}
+          <div style={{
+            height: 8,
+            backgroundImage: "linear-gradient(135deg,#0a0a0a 33.33%,transparent 33.33%),linear-gradient(-135deg,#0a0a0a 33.33%,transparent 33.33%)",
+            backgroundSize: "12px 8px",
+            backgroundRepeat: "repeat-x",
+          }} />
 
-          {/* Column headers */}
-          <div className="grid grid-cols-[3fr_3fr_1fr_2.5fr_2fr] text-[9px] text-[#888] uppercase tracking-wider mb-1">
-            <span>Item</span>
-            <span className="text-center">Pace</span>
-            <span className="text-center">Zn</span>
-            <span className="text-center">Time</span>
-            <span className="text-right">HR</span>
-          </div>
+          <div style={{ padding: "16px 18px 24px" }}>
+            {/* Header */}
+            <p style={{ ...MONO, fontWeight: 700, fontSize: 18, color: "#111", textAlign: "center", marginBottom: 4 }}>{`(>ᴗ•)ᕤ`}</p>
+            <p style={{ ...MONO, fontWeight: 700, fontSize: 16, color: "#111", textAlign: "center", marginBottom: 2 }}>{typeLabel}&nbsp;&nbsp;RECEIPT</p>
+            <p style={{ ...MONO, fontSize: 11, color: "#555", textAlign: "center" }}>ORDER:#{orderNumber.padStart(4, "0")}</p>
+            <p style={{ ...MONO, fontSize: 11, color: "#555", textAlign: "center" }}>{dateStr}</p>
+            <p style={{ ...MONO, fontSize: 11, color: "#555", textAlign: "center", marginBottom: 12 }}>{workoutLine}</p>
 
-          <DashLine />
+            <DashLine />
 
-          {/* Lap rows */}
-          {laps.length > 0 ? (
-            <div className="space-y-0.5 my-1">
-              {laps.map((lap, i) => {
-                const isFastest = i === fastestLapIndex && laps.length > 2;
-                const zone = lap.zone || 2;
-                const zoneColor = ZONE_COLORS[zone];
-                return (
-                  <div
-                    key={lap.lapIndex}
-                    className="grid grid-cols-[3fr_3fr_1fr_2.5fr_2fr] items-center text-[11px] py-0.5"
-                  >
-                    <span className="font-medium flex items-center gap-1">
-                      {lapDistanceLabel(lap.distance)}
-                      {isFastest && (
-                        <span
-                          className="text-[7px] font-black px-1 py-0.5 rounded"
-                          style={{ background: "#111", color: "#FAFAF8" }}
-                        >
-                          FAST
-                        </span>
-                      )}
-                    </span>
-                    <span className="text-center text-[#111]">
-                      {lap.avgPace ? formatPace(lap.avgPace) : "—"}
-                    </span>
-                    <span className="flex justify-center">
-                      <span
-                        className="w-2.5 h-2.5 rounded-full inline-block"
-                        style={{ background: zoneColor }}
-                      />
-                    </span>
-                    <span className="text-center text-[#555]">
-                      {formatDuration(lap.duration)}
-                    </span>
-                    <span className="text-right text-[#555]">
-                      {lap.avgHeartRate ?? "—"}
-                    </span>
-                  </div>
-                );
-              })}
+            {/* Splits */}
+            {laps.length > 0 && (
+              <>
+                <div style={{ display: "grid", gridTemplateColumns: "3fr 2.5fr 1fr 2.5fr 2fr", marginTop: 8, marginBottom: 4, ...MONO }}>
+                  {["ITEM", paceColLabel, "ZONE", "TIME", "HR"].map((h, i) => (
+                    <span key={h} style={{ color: "#888", fontSize: 9, textAlign: i === 0 ? "left" : i === 4 ? "right" : "center" }}>{h}</span>
+                  ))}
+                </div>
+                <DashLine />
+                {laps.map((lap) => {
+                  const zone = lap.zone || 2;
+                  const zoneColor = ZONE_COLORS[zone];
+                  const isFastest = fastestLap?.lapIndex === lap.lapIndex && laps.length > 2;
+                  const lapPace = lap.avgPace
+                    ? isSwim ? formatPace100m(lap.avgPace) : isCycle ? `${formatSpeed(1 / lap.avgPace)}` : formatPace(lap.avgPace)
+                    : "—";
+                  return (
+                    <div key={lap.lapIndex} style={{ display: "grid", gridTemplateColumns: "3fr 2.5fr 1fr 2.5fr 2fr", alignItems: "center", padding: "9px 0", ...MONO }}>
+                      <span style={{ color: "#111", fontSize: 11, display: "flex", alignItems: "center", gap: 4 }}>
+                        {lapDistanceLabel(lap.distance)}
+                        {isFastest && <span style={{ background: "#111", color: "#fafaf8", fontSize: 6, fontWeight: 700, padding: "2px 5px", borderRadius: 6 }}>FAST</span>}
+                      </span>
+                      <span style={{ color: "#111", fontSize: 11, textAlign: "center" }}>{lapPace}</span>
+                      <span style={{ display: "flex", justifyContent: "center" }}>
+                        <span style={{ width: 10, height: 10, borderRadius: "50%", background: zoneColor, display: "inline-block" }} />
+                      </span>
+                      <span style={{ color: "#555", fontSize: 11, textAlign: "center" }}>{formatDuration(lap.duration)}</span>
+                      <span style={{ color: "#555", fontSize: 11, textAlign: "right" }}>{lap.avgHeartRate ?? "—"}</span>
+                    </div>
+                  );
+                })}
+
+                {/* HR summary */}
+                {avgHeartRate && (
+                  <>
+                    <DashLine />
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8, ...MONO }}>
+                      <span style={{ color: "#888", fontSize: 9 }}>HEART RATE</span>
+                      <span style={{ color: "#999", fontSize: 9 }}>{minHR}BPM~{maxHRVal ?? "?"}BPM</span>
+                      <span style={{ color: "#111", fontWeight: 700, fontSize: 9 }}>{avgHeartRate}BPM</span>
+                    </div>
+                    {hrValues.length > 0 && (
+                      <div style={{ display: "flex", alignItems: "flex-end", gap: 4, marginTop: 8, height: 28 }}>
+                        {hrValues.map((v, i) => (
+                          <div key={i} style={{ flex: 1, height: Math.max(Math.round((v / maxBarH) * 24), 3), borderRadius: 2, background: "#ccc" }} />
+                        ))}
+                      </div>
+                    )}
+                  </>
+                )}
+                <DashLine style={{ marginTop: 12 }} />
+              </>
+            )}
+
+            {/* Summary */}
+            <div style={{ marginTop: 8 }}>
+              {summaryRows.map(({ label, value }) => (
+                <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, ...MONO }}>
+                  <span style={{ color: "#888", fontSize: 9 }}>{label}</span>
+                  <span style={{ color: "#111", fontWeight: 700, fontSize: 9 }}>{value}</span>
+                </div>
+              ))}
             </div>
-          ) : (
-            <p className="text-center text-[10px] text-[#888] py-3">No lap data</p>
-          )}
 
-          <DashLine />
-
-          {/* HR summary */}
-          <div className="flex justify-between items-center text-[10px] my-2">
-            <span className="text-[#888] uppercase tracking-wider">Heart Rate</span>
-            <span className="text-[#888]">
-              {minHR}BPM ~ {maxHR}BPM
-            </span>
-            <span className="font-bold">{avgHeartRate}BPM</span>
-          </div>
-
-          {/* HR sparkline */}
-          {hrValues.length > 0 && (
-            <div className="flex items-end gap-1 h-8 mb-3">
-              {hrValues.map((v, i) => {
-                const minV = Math.min(...hrValues);
-                const maxV = Math.max(...hrValues);
-                const h = Math.round(((v - minV) / (maxV - minV)) * 24) + 4;
-                return (
-                  <div
-                    key={i}
-                    className="flex-1 rounded-sm"
-                    style={{ height: h, background: "#CCC" }}
-                  />
-                );
-              })}
-            </div>
-          )}
-
-          <DashLine />
-
-          {/* Totals */}
-          <div className="space-y-1 my-3 text-[11px]">
-            <TotalRow label="TOTAL" value={distance ? `${formatDistance(distance)} KM` : "—"} bold />
-            <TotalRow label="DURATION" value={formatDuration(duration)} />
-            {avgPace && <TotalRow label="AVG PACE" value={formatPace(avgPace) + "/KM"} />}
-            {bestLapPace && <TotalRow label="BEST 1K" value={formatPace(bestLapPace) + "/KM"} />}
-            {steps && <TotalRow label="EST. STEPS" value={steps.toLocaleString()} />}
-            {calories && <TotalRow label="CALORIES" value={`${calories} KCAL`} />}
-            {elevGain && <TotalRow label="ELEVATION" value={`+${Math.round(elevGain)}m`} />}
-          </div>
-
-          <DashLine />
-
-          {/* Footer */}
-          <div className="text-center mt-4 space-y-1">
-            <p className="text-[10px] font-bold text-[#666] tracking-widest">
-              *** DUPLICATE COPY ***
-            </p>
-            <p className="text-[9px] text-[#999] tracking-wider uppercase">
-              Keep for your records
-            </p>
-            <p className="text-[8px] text-[#BBB] leading-relaxed mt-2">
-              Every run leaves a trace. TryAthlete turns it into
-              <br />
+            {/* Footer */}
+            <DashLine style={{ marginTop: 4 }} />
+            <p style={{ ...MONO, fontWeight: 700, fontSize: 9, color: "#888", textAlign: "center", marginTop: 12 }}>*** DUPLICATE COPY ***</p>
+            <p style={{ ...MONO, fontSize: 8, color: "#aaa", textAlign: "center", marginTop: 4 }}>KEEP FOR YOUR RECORDS</p>
+            <p style={{ ...MONO, fontSize: 7, color: "#bbb", textAlign: "center", marginTop: 8, lineHeight: 1.6 }}>
+              Every run leaves a trace. TryAthlete turns it into<br />
               something you can keep and share.
             </p>
-            <p className="text-[10px] font-bold text-[#555] mt-3">
+            <p style={{ ...MONO, fontWeight: 700, fontSize: 9, color: "#555", textAlign: "center", marginTop: 12 }}>
               🏃 TryAthlete · tryathlete.app
             </p>
           </div>
+
+          {/* Jagged bottom */}
+          <div style={{
+            height: 8,
+            backgroundImage: "linear-gradient(45deg,#0a0a0a 33.33%,transparent 33.33%),linear-gradient(-45deg,#0a0a0a 33.33%,transparent 33.33%)",
+            backgroundSize: "12px 8px",
+            backgroundRepeat: "repeat-x",
+            backgroundPosition: "left bottom",
+          }} />
         </div>
       </div>
     </div>
   );
 }
 
-function DashLine() {
+function DashLine({ style }: { style?: React.CSSProperties }) {
   return (
-    <div
-      className="my-2"
-      style={{
-        borderTop: "1px dashed #BBBBB",
-        borderTopColor: "#BBBBBB",
-      }}
-    />
-  );
-}
-
-function TotalRow({
-  label,
-  value,
-  bold,
-}: {
-  label: string;
-  value: string;
-  bold?: boolean;
-}) {
-  return (
-    <div className="flex justify-between">
-      <span className="text-[#888] uppercase tracking-wider">{label}</span>
-      <span className={bold ? "font-bold text-[#111]" : "font-medium text-[#333]"}>
-        {value}
-      </span>
-    </div>
+    <div style={{
+      width: "100%",
+      height: 1,
+      backgroundImage: "repeating-linear-gradient(to right,#bbb 0,#bbb 4px,transparent 4px,transparent 8px)",
+      ...style,
+    }} />
   );
 }

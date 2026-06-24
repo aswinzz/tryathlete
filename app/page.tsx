@@ -24,22 +24,16 @@ export default function LandingPage() {
       <div className="relative z-10 flex flex-col flex-1">
         {/* Wordmark */}
         <div className="mb-2">
-          <h1 className="text-5xl font-black leading-none tracking-tight text-white">
+          <h1 className="text-[52px] font-black leading-none tracking-tight text-white">
             TRY
           </h1>
           <h1
-            className="text-5xl font-black leading-none tracking-tight"
+            className="text-[52px] font-black leading-none tracking-tight"
             style={{ color: "var(--accent)" }}
           >
             ATHLETE
           </h1>
         </div>
-
-        {/* Accent line */}
-        <div
-          className="w-12 h-1 rounded-full mb-5 mt-3"
-          style={{ background: "var(--accent)" }}
-        />
 
         {/* Tagline */}
         <p className="text-3xl font-bold text-white leading-snug mb-3">

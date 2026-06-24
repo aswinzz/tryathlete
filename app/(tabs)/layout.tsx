@@ -2,7 +2,7 @@ import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { BottomNav } from "@/components/layout/BottomNav";
 
-export default async function DashboardLayout({
+export default async function TabsLayout({
   children,
 }: {
   children: React.ReactNode;

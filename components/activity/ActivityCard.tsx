@@ -5,8 +5,10 @@ import {
   formatDuration,
   formatDistance,
   formatPace,
+  formatSpeed,
+  formatPace100m,
   getActivityIcon,
-  getActivityTypeLabel,
+  getActivityCategory,
   ZONE_COLORS,
 } from "@/lib/utils";
 import { cn } from "@/lib/utils";
@@ -21,6 +23,8 @@ interface ActivityCardProps {
   distance?: number | null;
   avgHeartRate?: number | null;
   avgPace?: number | null;
+  elevGain?: number | null;
+  calories?: number | null;
   zone?: number;
   isPR?: boolean;
 }
@@ -34,10 +38,43 @@ export function ActivityCard({
   distance,
   avgHeartRate,
   avgPace,
+  elevGain,
+  calories,
   zone = 2,
   isPR,
 }: ActivityCardProps) {
   const zoneColor = ZONE_COLORS[zone] || ZONE_COLORS[2];
+  const category = getActivityCategory(type);
+  const t = type.toLowerCase();
+  const isSwim = t.includes("swim");
+  const isCycle = t.includes("cycl") || t.includes("bike") || t.includes("ride");
+
+  // Build stat cells based on activity type
+  const stats: { label: string; value: string }[] = [];
+
+  if (category === "endurance") {
+    if (distance) {
+      const distLabel = isSwim ? `${Math.round(distance)}m` : `${formatDistance(distance)} km`;
+      stats.push({ label: "DIST", value: distLabel });
+    }
+    if (isCycle && avgPace) {
+      // avgPace is seconds/meter; speed = 1/avgPace * 3.6
+      stats.push({ label: "SPEED", value: `${formatSpeed(1 / avgPace)} km/h` });
+    } else if (isSwim && avgPace) {
+      stats.push({ label: "PACE", value: `${formatPace100m(avgPace)}/100m` });
+    } else if (avgPace) {
+      stats.push({ label: "PACE", value: formatPace(avgPace) });
+    }
+    stats.push({ label: "TIME", value: formatDuration(duration) });
+    if (avgHeartRate) stats.push({ label: "HR", value: `${avgHeartRate} bpm` });
+    else if (isCycle && elevGain) stats.push({ label: "ELEV", value: `+${Math.round(elevGain)}m` });
+  } else {
+    // strength / hiit
+    stats.push({ label: "TIME", value: formatDuration(duration) });
+    if (avgHeartRate) stats.push({ label: "AVG HR", value: `${avgHeartRate} bpm` });
+    if (calories) stats.push({ label: "KCAL", value: calories.toLocaleString() });
+    if (elevGain) stats.push({ label: "ELEV", value: `+${Math.round(elevGain)}m` });
+  }
 
   return (
     <div className="relative bg-[var(--surface-2)] rounded-2xl overflow-hidden">
@@ -60,7 +97,7 @@ export function ActivityCard({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <p className="font-semibold text-[var(--text)] text-sm">{name}</p>
+                <p className="font-semibold text-[var(--text)] text-[14px]">{name}</p>
                 {isPR && <Badge variant="accent">PR</Badge>}
               </div>
               <p className="text-xs text-[var(--text-2)] mt-0.5">
@@ -78,20 +115,15 @@ export function ActivityCard({
         </div>
 
         {/* Stats row */}
-        <div className="border-t border-[var(--border)] pt-3">
-          <div className="grid grid-cols-4 gap-2">
-            {distance && (
-              <Stat label="DIST" value={`${formatDistance(distance)} km`} />
-            )}
-            <Stat label="TIME" value={formatDuration(duration)} />
-            {avgPace && (
-              <Stat label="PACE" value={formatPace(avgPace)} />
-            )}
-            {avgHeartRate && (
-              <Stat label="HR" value={`${avgHeartRate} bpm`} />
-            )}
+        {stats.length > 0 && (
+          <div className="border-t border-[var(--border)] pt-3">
+            <div className={cn("grid gap-2", `grid-cols-${Math.min(stats.length, 4)}`)}>
+              {stats.slice(0, 4).map(({ label, value }, i) => (
+                <Stat key={i} label={label} value={value} />
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Tap to view */}
@@ -103,8 +135,8 @@ export function ActivityCard({
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="text-[11px] font-semibold text-[var(--text)] truncate">{value}</p>
-      <p className="text-[9px] font-semibold text-[var(--text-2)] mt-0.5 uppercase tracking-wider">{label}</p>
+      <p className="text-[11px] font-semibold text-[var(--text)] truncate leading-tight">{value}</p>
+      <p className="text-[9px] text-[var(--text-2)] mt-0.5 uppercase tracking-wider">{label}</p>
     </div>
   );
 }

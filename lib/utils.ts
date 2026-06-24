@@ -42,23 +42,50 @@ export const ZONE_COLORS: Record<number, string> = {
   5: "#FF4757",
 };
 
+export type ActivityCategory = "endurance" | "strength" | "hiit";
+
+export function getActivityCategory(type: string): ActivityCategory {
+  const t = type.toLowerCase();
+  if (t.includes("strength") || t.includes("gym") || t.includes("weight") || t.includes("functional_strength")) return "strength";
+  if (t.includes("hiit") || t.includes("crossfit") || t.includes("circuit")) return "hiit";
+  return "endurance";
+}
+
+export function formatSpeed(metersPerSecond: number): string {
+  return (metersPerSecond * 3.6).toFixed(1);
+}
+
+export function formatPace100m(secondsPerMeter: number): string {
+  const secsPerHundred = secondsPerMeter * 100;
+  const mins = Math.floor(secsPerHundred / 60);
+  const secs = Math.round(secsPerHundred % 60);
+  return `${mins}:${secs.toString().padStart(2, "0")}`;
+}
+
 export function getActivityIcon(type: string): string {
   const t = type.toLowerCase();
   if (t.includes("run")) return "🏃";
   if (t.includes("cycl") || t.includes("bike") || t.includes("ride")) return "🚴";
   if (t.includes("swim")) return "🏊";
-  if (t.includes("strength") || t.includes("gym")) return "🏋️";
+  if (t.includes("strength") || t.includes("gym") || t.includes("weight")) return "🏋️";
   if (t.includes("hike") || t.includes("walk")) return "🥾";
+  if (t.includes("hiit") || t.includes("crossfit")) return "⚡";
+  if (t.includes("yoga")) return "🧘";
+  if (t.includes("row")) return "🚣";
   return "⚡";
 }
 
 export function getActivityTypeLabel(type: string): string {
   const t = type.toLowerCase();
   if (t.includes("run")) return "Run";
-  if (t.includes("cycl") || t.includes("bike") || t.includes("ride")) return "Cycle";
+  if (t.includes("cycl") || t.includes("bike") || t.includes("ride")) return "Cycling";
   if (t.includes("swim")) return "Swim";
-  if (t.includes("strength") || t.includes("gym")) return "Strength";
+  if (t.includes("strength") || t.includes("gym") || t.includes("weight")) return "Strength";
+  if (t.includes("hiit") || t.includes("crossfit")) return "HIIT";
   if (t.includes("hike")) return "Hike";
+  if (t.includes("walk")) return "Walk";
+  if (t.includes("yoga")) return "Yoga";
+  if (t.includes("row")) return "Rowing";
   return "Workout";
 }
 
