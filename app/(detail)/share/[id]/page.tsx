@@ -14,6 +14,14 @@ import { OverlayBoldCard } from "@/components/cards/OverlayBoldCard";
 import { OverlayPillsCard } from "@/components/cards/OverlayPillsCard";
 import { Button } from "@/components/ui/Button";
 import { Download, Share2, ArrowLeft } from "lucide-react";
+import {
+  CardConfig,
+  DEFAULT_CONFIG,
+  HERO_LABELS,
+  TOGGLE_LABELS,
+  availableHeroOptions,
+  availableShowToggles,
+} from "@/lib/cardConfig";
 
 interface Activity {
   id: string;
@@ -76,7 +84,15 @@ export default function SharePage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [format, setFormat] = useState<Format>("receipt");
+  const [config, setConfig] = useState<CardConfig>(DEFAULT_CONFIG);
   const cardRef = useRef<HTMLDivElement>(null);
+
+  function setHero(hero: CardConfig["hero"]) {
+    setConfig((c) => ({ ...c, hero }));
+  }
+  function toggleStat(key: keyof CardConfig["show"]) {
+    setConfig((c) => ({ ...c, show: { ...c.show, [key]: !c.show[key] } }));
+  }
 
   useEffect(() => {
     fetch(`/api/activities/${id}`)
@@ -234,17 +250,82 @@ export default function SharePage() {
         </p>
       </div>
 
+      {/* Stat configurator */}
+      {(() => {
+        const activityData = {
+          type: activity.type,
+          duration: activity.duration,
+          distance: activity.distance,
+          avgPace: activity.avgPace,
+          avgHeartRate: activity.avgHeartRate,
+          maxHeartRate: activity.maxHeartRate,
+          calories: activity.calories,
+          elevGain: activity.elevGain,
+          steps: activity.steps,
+        };
+        const heroOptions = availableHeroOptions(activityData);
+        const showToggles = availableShowToggles(activityData);
+        return (
+          <div className="px-5 mb-4 space-y-3">
+            {/* Hero stat */}
+            {heroOptions.length > 1 && (
+              <div>
+                <p className="text-[9px] font-bold text-[var(--text-3)] uppercase tracking-widest mb-2">Main stat</p>
+                <div className="flex gap-2">
+                  {heroOptions.map((h) => (
+                    <button
+                      key={h}
+                      onClick={() => setHero(h)}
+                      className="text-[11px] font-semibold px-3 py-1.5 rounded-full transition-all"
+                      style={{
+                        background: config.hero === h ? "var(--accent)" : "var(--surface-2)",
+                        color: config.hero === h ? "#000" : "var(--text-2)",
+                      }}
+                    >
+                      {HERO_LABELS[h]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {/* Stat toggles */}
+            <div>
+              <p className="text-[9px] font-bold text-[var(--text-3)] uppercase tracking-widest mb-2">Show</p>
+              <div className="flex gap-2 flex-wrap">
+                {showToggles.map((key) => {
+                  const on = config.show[key];
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => toggleStat(key)}
+                      className="text-[11px] font-semibold px-3 py-1.5 rounded-full transition-all"
+                      style={{
+                        background: on ? "var(--surface-3)" : "var(--surface-2)",
+                        color: on ? "var(--text)" : "var(--text-3)",
+                        border: on ? "1px solid var(--border)" : "1px solid transparent",
+                      }}
+                    >
+                      {on ? "✓ " : ""}{TOGGLE_LABELS[key]}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Card preview */}
       <div className="flex-1 overflow-y-auto px-5 pb-4">
         {format === "receipt" && (
           <RunReceipt receiptRef={cardRef} orderNumber={activity.id.slice(-4).toUpperCase()} {...sharedProps} />
         )}
-        {format === "dark" && <DarkCard cardRef={cardRef} {...sharedProps} />}
-        {format === "neon" && <NeonCard cardRef={cardRef} {...sharedProps} />}
-        {format === "night" && <NightCard cardRef={cardRef} {...sharedProps} />}
-        {format === "story" && <StoryCard cardRef={cardRef} {...sharedProps} />}
-        {format === "retro" && <RetroCard cardRef={cardRef} {...sharedProps} />}
-        {format === "minimal" && <MinimalCard cardRef={cardRef} {...sharedProps} />}
+        {format === "dark" && <DarkCard cardRef={cardRef} config={config} {...sharedProps} />}
+        {format === "neon" && <NeonCard cardRef={cardRef} config={config} {...sharedProps} />}
+        {format === "night" && <NightCard cardRef={cardRef} config={config} {...sharedProps} />}
+        {format === "story" && <StoryCard cardRef={cardRef} config={config} {...sharedProps} />}
+        {format === "retro" && <RetroCard cardRef={cardRef} config={config} {...sharedProps} />}
+        {format === "minimal" && <MinimalCard cardRef={cardRef} config={config} {...sharedProps} />}
 
         {/* Overlay variants — checkerboard preview shows transparency */}
         {(format === "overlay-clean" || format === "overlay-bar" || format === "overlay-bold" || format === "overlay-pills") && (
@@ -255,10 +336,10 @@ export default function SharePage() {
               backgroundSize: "14px 14px",
             }}
           >
-            {format === "overlay-clean"  && <TransparentCard cardRef={cardRef} {...sharedProps} />}
-            {format === "overlay-bar"    && <OverlayBarCard cardRef={cardRef} {...sharedProps} />}
-            {format === "overlay-bold"   && <OverlayBoldCard cardRef={cardRef} {...sharedProps} />}
-            {format === "overlay-pills"  && <OverlayPillsCard cardRef={cardRef} {...sharedProps} />}
+            {format === "overlay-clean"  && <TransparentCard cardRef={cardRef} config={config} {...sharedProps} />}
+            {format === "overlay-bar"    && <OverlayBarCard cardRef={cardRef} config={config} {...sharedProps} />}
+            {format === "overlay-bold"   && <OverlayBoldCard cardRef={cardRef} config={config} {...sharedProps} />}
+            {format === "overlay-pills"  && <OverlayPillsCard cardRef={cardRef} config={config} {...sharedProps} />}
           </div>
         )}
       </div>

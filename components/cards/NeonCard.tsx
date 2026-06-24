@@ -1,16 +1,15 @@
 "use client";
 import {
-  formatPace,
   formatDuration,
-  formatDistance,
+  formatPace,
   formatSpeed,
   formatPace100m,
-  getActivityCategory,
   getActivityTypeLabel,
   ZONE_COLORS,
   lapDistanceLabel,
 } from "@/lib/utils";
 import { format } from "date-fns";
+import { CardConfig, DEFAULT_CONFIG, resolveHero, resolveStats } from "@/lib/cardConfig";
 
 interface Lap {
   lapIndex: number;
@@ -36,6 +35,7 @@ interface NeonCardProps {
   elevGain?: number | null;
   steps?: number | null;
   laps?: Lap[];
+  config?: CardConfig;
 }
 
 const BG = "#050505";
@@ -46,114 +46,51 @@ const TEXT = "#ffffff";
 const TEXT2 = "rgba(255,255,255,0.4)";
 
 export function NeonCard({
-  cardRef,
-  type,
-  startTime,
-  duration,
-  distance,
-  avgHeartRate,
-  maxHeartRate,
-  avgPace,
-  calories,
-  elevGain,
-  laps = [],
+  cardRef, type, startTime, duration, distance,
+  avgHeartRate, maxHeartRate, avgPace, calories, elevGain, steps,
+  laps = [], config = DEFAULT_CONFIG,
 }: NeonCardProps) {
-  const category = getActivityCategory(type);
   const t = type.toLowerCase();
-  const isRun = t.includes("run");
-  const isCycle = t.includes("cycl") || t.includes("bike") || t.includes("ride");
   const isSwim = t.includes("swim");
-  const isEndurance = category === "endurance";
+  const isCycle = t.includes("cycl") || t.includes("bike") || t.includes("ride");
 
   const typeLabel = getActivityTypeLabel(type).toUpperCase();
   const dateStr = format(new Date(startTime), "MMM d, yyyy").toUpperCase();
   const timeStr = format(new Date(startTime), "HH:mm");
 
-  const heroValue =
-    isEndurance && distance
-      ? isSwim ? `${Math.round(distance)}` : formatDistance(distance)
-      : formatDuration(duration);
-  const heroUnit = isEndurance && distance ? (isSwim ? "M" : "KM") : "";
-
-  type Stat = { label: string; value: string };
-  let quickStats: Stat[];
-  if (isRun) {
-    quickStats = [
-      { label: "AVG PACE", value: avgPace ? formatPace(avgPace) : "—" },
-      { label: "DURATION", value: formatDuration(duration) },
-      { label: "AVG HR", value: avgHeartRate ? `${avgHeartRate}` : "—" },
-    ];
-  } else if (isCycle) {
-    quickStats = [
-      { label: "AVG SPEED", value: avgPace ? `${formatSpeed(1 / avgPace)}` : "—" },
-      { label: "DURATION", value: formatDuration(duration) },
-      { label: "ELEV", value: elevGain ? `+${Math.round(elevGain)}m` : "—" },
-    ];
-  } else if (isSwim) {
-    quickStats = [
-      { label: "PACE/100M", value: avgPace ? formatPace100m(avgPace) : "—" },
-      { label: "DURATION", value: formatDuration(duration) },
-      { label: "AVG HR", value: avgHeartRate ? `${avgHeartRate}` : "—" },
-    ];
-  } else {
-    quickStats = [
-      { label: "DURATION", value: formatDuration(duration) },
-      { label: "AVG HR", value: avgHeartRate ? `${avgHeartRate}` : "—" },
-      { label: "KCAL", value: calories ? `${calories.toLocaleString()}` : "—" },
-    ];
-  }
+  const data = { type, duration, distance, avgPace, avgHeartRate, maxHeartRate, calories, elevGain, steps };
+  const { value: heroValue, unit: heroUnit } = resolveHero(config, data);
+  const quickStats = resolveStats(config, data, 3);
+  const showLaps = config.show.laps && laps.length > 0;
 
   const fastestLap = laps.reduce(
-    (best: Lap | null, l) =>
-      !best || (l.avgPace && (!best.avgPace || l.avgPace < best.avgPace)) ? l : best,
-    null
+    (best: Lap | null, l) => !best || (l.avgPace && (!best.avgPace || l.avgPace < best.avgPace)) ? l : best, null
   );
-
   const paceColLabel = isSwim ? "PACE/100M" : isCycle ? "SPEED" : "PACE";
 
   return (
-    <div
-      ref={cardRef}
-      style={{
-        background: BG,
-        borderRadius: 20,
-        overflow: "hidden",
-        padding: "24px 22px 28px",
-        width: "100%",
-        boxSizing: "border-box",
-        border: `1px solid ${BORDER_ACCENT}`,
-      }}
-    >
-      {/* Top row: type + date */}
+    <div ref={cardRef} style={{ background: BG, borderRadius: 20, overflow: "hidden", padding: "24px 22px 28px", width: "100%", boxSizing: "border-box", border: `1px solid ${BORDER_ACCENT}` }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
         <span style={{ fontFamily: "system-ui, sans-serif", fontSize: 10, fontWeight: 700, color: ACCENT, letterSpacing: "0.16em", textTransform: "uppercase" }}>{typeLabel}</span>
         <span style={{ fontFamily: "system-ui, sans-serif", fontSize: 10, color: TEXT2, letterSpacing: "0.08em" }}>{dateStr} · {timeStr}</span>
       </div>
-
-      {/* Hero — lime */}
       <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 20 }}>
-        <span style={{ fontFamily: "system-ui, sans-serif", fontSize: 72, fontWeight: 900, color: ACCENT, lineHeight: 1, letterSpacing: "-0.02em" }}>
-          {heroValue}
-        </span>
-        {heroUnit && (
-          <span style={{ fontFamily: "system-ui, sans-serif", fontSize: 26, fontWeight: 700, color: "rgba(200,255,0,0.5)", marginBottom: 4 }}>
-            {heroUnit}
-          </span>
-        )}
+        <span style={{ fontFamily: "system-ui, sans-serif", fontSize: 72, fontWeight: 900, color: ACCENT, lineHeight: 1, letterSpacing: "-0.02em" }}>{heroValue}</span>
+        {heroUnit && <span style={{ fontFamily: "system-ui, sans-serif", fontSize: 26, fontWeight: 700, color: "rgba(200,255,0,0.5)", marginBottom: 4 }}>{heroUnit}</span>}
       </div>
 
-      {/* Quick stats */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, paddingTop: 14, paddingBottom: 14, borderTop: `1px solid ${BORDER_ACCENT}`, marginBottom: laps.length > 0 ? 0 : 4 }}>
-        {quickStats.map(({ label, value }, i) => (
-          <div key={label} style={i > 0 ? { borderLeft: `1px solid ${BORDER_ACCENT}`, paddingLeft: 12 } : {}}>
-            <p style={{ fontFamily: "system-ui, sans-serif", fontSize: 16, fontWeight: 800, color: TEXT, lineHeight: 1 }}>{value}</p>
-            <p style={{ fontFamily: "system-ui, sans-serif", fontSize: 9, fontWeight: 600, color: ACCENT, opacity: 0.7, textTransform: "uppercase", letterSpacing: "0.1em", marginTop: 4 }}>{label}</p>
-          </div>
-        ))}
-      </div>
+      {quickStats.length > 0 && (
+        <div style={{ display: "grid", gridTemplateColumns: `repeat(${quickStats.length}, 1fr)`, gap: 12, paddingTop: 14, paddingBottom: 14, borderTop: `1px solid ${BORDER_ACCENT}`, marginBottom: showLaps ? 0 : 4 }}>
+          {quickStats.map(({ label, value }, i) => (
+            <div key={label} style={i > 0 ? { borderLeft: `1px solid ${BORDER_ACCENT}`, paddingLeft: 12 } : {}}>
+              <p style={{ fontFamily: "system-ui, sans-serif", fontSize: 16, fontWeight: 800, color: TEXT, lineHeight: 1 }}>{value}</p>
+              <p style={{ fontFamily: "system-ui, sans-serif", fontSize: 9, fontWeight: 600, color: ACCENT, opacity: 0.7, textTransform: "uppercase", letterSpacing: "0.1em", marginTop: 4 }}>{label}</p>
+            </div>
+          ))}
+        </div>
+      )}
 
-      {/* Laps */}
-      {laps.length > 0 && (
+      {showLaps && (
         <div style={{ borderTop: `1px solid ${BORDER_ACCENT}`, paddingTop: 12, marginTop: 4 }}>
           <div style={{ display: "grid", gridTemplateColumns: "3fr 2.5fr 1fr 2.5fr 2fr", marginBottom: 8 }}>
             {["SPLIT", paceColLabel, "Z", "TIME", "HR"].map((h, i) => (
@@ -164,9 +101,7 @@ export function NeonCard({
             const zone = lap.zone || 2;
             const zoneColor = ZONE_COLORS[zone];
             const isFastest = fastestLap?.lapIndex === lap.lapIndex && laps.length > 2;
-            const lapPace = lap.avgPace
-              ? isSwim ? formatPace100m(lap.avgPace) : isCycle ? `${formatSpeed(1 / lap.avgPace)}` : formatPace(lap.avgPace)
-              : "—";
+            const lapPace = lap.avgPace ? (isSwim ? formatPace100m(lap.avgPace) : isCycle ? `${formatSpeed(1 / lap.avgPace)}` : formatPace(lap.avgPace)) : "—";
             return (
               <div key={lap.lapIndex} style={{ display: "grid", gridTemplateColumns: "3fr 2.5fr 1fr 2.5fr 2fr", alignItems: "center", padding: "8px 0", borderBottom: `1px solid ${BORDER}` }}>
                 <span style={{ fontFamily: "system-ui, sans-serif", fontSize: 11, color: TEXT, display: "flex", alignItems: "center", gap: 5 }}>
