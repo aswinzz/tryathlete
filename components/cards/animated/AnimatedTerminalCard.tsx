@@ -27,7 +27,7 @@ export interface AnimatedTerminalCardProps {
   animKey?: number;
 }
 
-const LW = 360, LH = 480, PR = 2;
+const LW = 360, LH = 640, PR = 2; // 9:16
 const CW = LW * PR, CH = LH * PR;
 
 export const ANIM_TERMINAL_DURATION = 5600;
@@ -127,15 +127,15 @@ export function AnimatedTerminalCard({
     const UNIT_FS    = 11 * s;  // unit label
     const STAT_FS    = 9  * s;  // key: value rows
 
-    // ── Y positions (canvas px) ────────────────────────────────────────────
-    const COMMENT_Y = 24 * s;
-    const PROMPT_Y  = 42 * s;
-    const LOAD_Y    = 60 * s;
-    const PROG_Y    = 78 * s;
-    const HERO_Y    = 130 * s;  // hero top — 78px font → bottom at 208*s
-    const UNIT_Y    = 215 * s;
-    const DIV_Y     = 240 * s;
-    const STAT_Y0   = 258 * s;
+    // ── Y positions (canvas px) — shifted down to centre in 9:16 ─────────
+    const COMMENT_Y = 100 * s;
+    const PROMPT_Y  = 118 * s;
+    const LOAD_Y    = 136 * s;
+    const PROG_Y    = 154 * s;
+    const HERO_Y    = 210 * s;  // hero top — 78px font → bottom at 288*s
+    const UNIT_Y    = 295 * s;
+    const DIV_Y     = 320 * s;
+    const STAT_Y0   = 338 * s;
     const STAT_STEP = 22 * s;
     const PX        = 22 * s;   // left margin
 
@@ -329,7 +329,7 @@ export function AnimatedTerminalCard({
         width: "100%",
         aspectRatio: `${LW} / ${LH}`,
         display: "block",
-        borderRadius: 16,
+        borderRadius: 0,
       }}
     />
   );

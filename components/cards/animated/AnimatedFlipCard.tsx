@@ -27,7 +27,7 @@ export interface AnimatedFlipCardProps {
   animKey?: number;
 }
 
-const LW = 360, LH = 480, PR = 2;
+const LW = 360, LH = 640, PR = 2; // 9:16
 const CW = LW * PR, CH = LH * PR;
 
 export const ANIM_FLIP_DURATION = 5800;
@@ -471,7 +471,7 @@ export function AnimatedFlipCard({
         width: "100%",
         aspectRatio: `${LW} / ${LH}`,
         display: "block",
-        borderRadius: 16,
+        borderRadius: 0,
       }}
     />
   );

@@ -21,7 +21,7 @@ export interface AnimatedECGCardProps {
   animKey?: number;
 }
 
-const LW = 360, LH = 480, PR = 2;
+const LW = 360, LH = 640, PR = 2; // 9:16
 const CW = LW * PR, CH = LH * PR;
 
 export const ANIM_ECG_DURATION = 6200;
@@ -104,7 +104,7 @@ export function AnimatedECGCard({
     const ctx = canvas.getContext("2d")!;
     const s = PR;
 
-    const ECG_CENTER_Y = 205 * s;
+    const ECG_CENTER_Y = 255 * s;  // 40% of 640 logical
     const AMPLITUDE    = 72 * s;
     const pathPts = buildPath(ECG_CENTER_Y, AMPLITUDE);
 
@@ -260,7 +260,7 @@ export function AnimatedECGCard({
       if (divA > 0) {
         ctx.globalAlpha = divA * 0.18;
         ctx.fillStyle = "#c8ff00";
-        ctx.fillRect(20 * s, 315 * s, (CW - 40 * s) * divA, 1 * s);
+        ctx.fillRect(20 * s, 400 * s, (CW - 40 * s) * divA, 1 * s);
         ctx.globalAlpha = 1;
       }
 
@@ -272,7 +272,7 @@ export function AnimatedECGCard({
           if (statA <= 0) return;
           const lift = (1 - statA) * 16 * s;
           const cx   = 20 * s + i * cellW + cellW / 2;
-          const sy   = 370 * s - lift;
+          const sy   = 460 * s - lift;
 
           ctx.globalAlpha = statA;
 
@@ -309,7 +309,7 @@ export function AnimatedECGCard({
         width: "100%",
         aspectRatio: `${LW} / ${LH}`,
         display: "block",
-        borderRadius: 16,
+        borderRadius: 0,
       }}
     />
   );

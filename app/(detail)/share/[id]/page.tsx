@@ -100,7 +100,8 @@ export default function SharePage() {
   const [receiptKey, setReceiptKey] = useState(0);
   const [animKey, setAnimKey] = useState(0);
   const [config, setConfig] = useState<CardConfig>(DEFAULT_CONFIG);
-  const cardRef = useRef<HTMLDivElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);         // receipt element ref (for video capture sizing)
+  const exportWrapperRef = useRef<HTMLDivElement>(null); // 9:16 wrapper — captured for static PNGs
   const animCanvasRef = useRef<HTMLCanvasElement>(null);
 
   const CANVAS_ANIM_FORMATS: Format[] = ["anim-count", "anim-ecg", "anim-flip", "anim-terminal"];
@@ -127,13 +128,20 @@ export default function SharePage() {
 
   const activeFormat = FORMATS.find((f) => f.id === format)!;
 
-  /** Static PNG capture for non-animated card formats */
+  /** Static PNG capture — always uses the 9:16 export wrapper. */
   async function captureImage(): Promise<string | null> {
-    if (!cardRef.current) return null;
+    const el = exportWrapperRef.current;
+    if (!el) return null;
     const { toPng } = await import("html-to-image");
-    const opts: Parameters<typeof toPng>[1] = { quality: 1, pixelRatio: 3 };
+    const opts: Parameters<typeof toPng>[1] = {
+      quality: 1,
+      pixelRatio: 3,
+      // Skip preview-only UI (e.g. checkerboard behind overlay cards)
+      filter: (node: Node) =>
+        !(node instanceof Element && node.classList.contains("preview-only")),
+    };
     if (activeFormat.bg) opts.backgroundColor = activeFormat.bg;
-    return toPng(cardRef.current, opts);
+    return toPng(el, opts);
   }
 
   /**
@@ -147,16 +155,11 @@ export default function SharePage() {
     const el = cardRef.current;
     if (!el) return null;
 
-    const scale = 2;
-    const elW = el.offsetWidth;
-    const elH = el.offsetHeight;
-    if (!elW || !elH) return null;
-
     // ── Step 1: capture receipt content as static image ──────────────────
     const { toPng } = await import("html-to-image");
     let staticDataUrl: string;
     try {
-      staticDataUrl = await toPng(el, { pixelRatio: scale, backgroundColor: "#FAFAF8" });
+      staticDataUrl = await toPng(el, { pixelRatio: 2, backgroundColor: "#FAFAF8" });
     } catch (e) {
       console.error("receipt capture failed", e);
       return null;
@@ -169,10 +172,10 @@ export default function SharePage() {
       receiptImg.src = staticDataUrl;
     });
 
-    // ── Step 2: recording canvas (printer height + receipt height) ────────
+    // ── Step 2: fixed 9:16 recording canvas ───────────────────────────────
     const PRINTER_H = 70; // logical px
-    const canvasW = elW * scale;
-    const canvasH = (elH + PRINTER_H) * scale;
+    const canvasW = 720;  // 360 × 2
+    const canvasH = 1280; // 640 × 2  (9:16)
 
     const rc = document.createElement("canvas");
     rc.width = canvasW;
@@ -193,6 +196,8 @@ export default function SharePage() {
     recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
 
     // ── Step 4: helpers ───────────────────────────────────────────────────
+    const scale = 2; // pixel ratio (canvas px / logical px)
+
     /** Draw the printer block on the canvas */
     function drawPrinter(blinkOn: boolean) {
       const s = scale;
@@ -259,10 +264,14 @@ export default function SharePage() {
       return 0;
     }
 
+    // Centre receipt horizontally within the 9:16 canvas
+    const receiptDrawX = Math.round((canvasW - receiptImg.width) / 2);
+    const PRINTER_PX   = PRINTER_H * 2; // 70 * 2 = 140 canvas px
+
     // ── Step 5: draw first frame then start recording ─────────────────────
-    ctx.fillStyle = "#0a0a0a";
+    ctx.fillStyle = "#FAFAF8";
     ctx.fillRect(0, 0, canvasW, canvasH);
-    ctx.drawImage(receiptImg, 0, PRINTER_H * scale + getYFraction(0) * receiptImg.height);
+    ctx.drawImage(receiptImg, receiptDrawX, PRINTER_PX + getYFraction(0) * receiptImg.height);
     drawPrinter(true);
 
     recorder.start();
@@ -281,12 +290,12 @@ export default function SharePage() {
         const yPx = getYFraction(elapsed) * receiptImg.height;
         const blinkOn = elapsed < ANIM_MS && Math.floor(elapsed / 300) % 2 === 0;
 
-        // Background
-        ctx.fillStyle = "#0a0a0a";
+        // Background — cream to match receipt
+        ctx.fillStyle = "#FAFAF8";
         ctx.fillRect(0, 0, canvasW, canvasH);
 
-        // Receipt (animated — starts fully hidden, slides into view)
-        ctx.drawImage(receiptImg, 0, PRINTER_H * scale + yPx);
+        // Receipt centred horizontally, animated vertically
+        ctx.drawImage(receiptImg, receiptDrawX, PRINTER_PX + yPx);
 
         // Scan-line glow at the printer slot — new content emerges through here
         if (elapsed < ANIM_MS) {
@@ -628,11 +637,59 @@ export default function SharePage() {
 
       {/* Card preview */}
       <div className="flex-1 overflow-y-auto px-5 pb-4">
-        {format === "receipt" && (
-          <RunReceipt receiptRef={cardRef} orderNumber={activity.id.slice(-4).toUpperCase()} {...sharedProps} />
+
+        {/* ── Static card formats — wrapped in a 9:16 export container ── */}
+        {!isReceiptAnim && !isCanvasAnim && (
+          <div
+            ref={exportWrapperRef}
+            className="export-wrap"
+            style={{
+              aspectRatio: "9 / 16",
+              width: "100%",
+              position: "relative",
+              overflow: "hidden",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: activeFormat.bg ?? "transparent",
+            }}
+          >
+            {format === "receipt" && (
+              <RunReceipt receiptRef={cardRef} orderNumber={activity.id.slice(-4).toUpperCase()} {...sharedProps} />
+            )}
+            {format === "dark"    && <DarkCard    cardRef={cardRef} config={config} {...sharedProps} />}
+            {format === "neon"    && <NeonCard    cardRef={cardRef} config={config} {...sharedProps} />}
+            {format === "night"   && <NightCard   cardRef={cardRef} config={config} {...sharedProps} />}
+            {format === "story"   && <StoryCard   cardRef={cardRef} config={config} {...sharedProps} />}
+            {format === "retro"   && <RetroCard   cardRef={cardRef} config={config} {...sharedProps} />}
+            {format === "minimal" && <MinimalCard cardRef={cardRef} config={config} {...sharedProps} />}
+
+            {/* Overlay variants — checkerboard is preview-only (excluded from PNG export) */}
+            {(format === "overlay-clean" || format === "overlay-bar" || format === "overlay-bold" || format === "overlay-pills") && (
+              <>
+                <div
+                  className="preview-only"
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    backgroundImage: "repeating-conic-gradient(#1e1e1e 0% 25%, #0a0a0a 0% 50%)",
+                    backgroundSize: "14px 14px",
+                    zIndex: 0,
+                  }}
+                />
+                <div style={{ position: "relative", zIndex: 1, width: "100%" }}>
+                  {format === "overlay-clean"  && <TransparentCard cardRef={cardRef} config={config} {...sharedProps} />}
+                  {format === "overlay-bar"    && <OverlayBarCard  cardRef={cardRef} config={config} {...sharedProps} />}
+                  {format === "overlay-bold"   && <OverlayBoldCard cardRef={cardRef} config={config} {...sharedProps} />}
+                  {format === "overlay-pills"  && <OverlayPillsCard cardRef={cardRef} config={config} {...sharedProps} />}
+                </div>
+              </>
+            )}
+          </div>
         )}
 
-        {format === "receipt-anim" && (
+        {/* ── Receipt animation ── */}
+        {isReceiptAnim && (
           <div style={{ position: "relative" }}>
             {/* Printer body */}
             <div style={{
@@ -646,119 +703,55 @@ export default function SharePage() {
               zIndex: 10,
               boxShadow: "0 6px 20px rgba(0,0,0,0.5)",
             }}>
-              {/* Left: feed ribs */}
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                 <div style={{ width: 36, height: 2, background: "#2e2e2e", borderRadius: 1 }} />
                 <div style={{ width: 28, height: 2, background: "#252525", borderRadius: 1 }} />
                 <div style={{ width: 32, height: 2, background: "#2e2e2e", borderRadius: 1 }} />
               </div>
-              {/* Center label */}
               <span style={{ fontFamily: "monospace", fontSize: 8, color: "#3a3a3a", letterSpacing: "0.16em", textTransform: "uppercase" }}>
                 THERMAL PRINTER
               </span>
-              {/* Right: blinking indicator */}
-              <div
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: "50%",
-                  background: "#c8ff00",
-                  boxShadow: "0 0 7px rgba(200,255,0,0.9)",
-                  animation: "printer-blink 0.6s ease-in-out 14",
-                }}
-              />
+              <div style={{
+                width: 8, height: 8, borderRadius: "50%",
+                background: "#c8ff00", boxShadow: "0 0 7px rgba(200,255,0,0.9)",
+                animation: "printer-blink 0.6s ease-in-out 14",
+              }} />
             </div>
-
-            {/* Paper slot + roller texture */}
+            {/* Paper slot roller */}
             <div style={{
-              height: 6,
-              position: "relative",
-              zIndex: 10,
+              height: 6, position: "relative", zIndex: 10,
               background: "repeating-linear-gradient(90deg, #0f0f0f 0px, #0f0f0f 4px, #111 4px, #111 8px)",
               animation: "printer-roller 0.08s linear infinite",
-              animationDelay: "0s",
               animationIterationCount: "30",
             }} />
-
-            {/* Animated receipt emerging from printer */}
+            {/* Animated receipt */}
             <div
               key={receiptKey}
               style={{ position: "relative", zIndex: 5, animation: "receipt-print 4.5s cubic-bezier(0.4, 0, 0.2, 1) both" }}
             >
-              {/* Scan-line glow sweep */}
-              <div
-                style={{
-                  position: "absolute",
-                  left: 0,
-                  right: 0,
-                  height: 24,
-                  pointerEvents: "none",
-                  zIndex: 20,
-                  background: "linear-gradient(180deg, rgba(200,255,0,0.08) 0%, rgba(200,255,0,0.04) 60%, transparent 100%)",
-                  animation: "receipt-scan 4.5s linear both",
-                }}
-              />
+              <div style={{
+                position: "absolute", left: 0, right: 0, height: 24,
+                pointerEvents: "none", zIndex: 20,
+                background: "linear-gradient(180deg, rgba(200,255,0,0.08) 0%, rgba(200,255,0,0.04) 60%, transparent 100%)",
+                animation: "receipt-scan 4.5s linear both",
+              }} />
               <RunReceipt receiptRef={cardRef} orderNumber={activity.id.slice(-4).toUpperCase()} {...sharedProps} />
             </div>
           </div>
         )}
-        {format === "dark" && <DarkCard cardRef={cardRef} config={config} {...sharedProps} />}
-        {format === "neon" && <NeonCard cardRef={cardRef} config={config} {...sharedProps} />}
-        {format === "night" && <NightCard cardRef={cardRef} config={config} {...sharedProps} />}
-        {format === "story" && <StoryCard cardRef={cardRef} config={config} {...sharedProps} />}
-        {format === "retro" && <RetroCard cardRef={cardRef} config={config} {...sharedProps} />}
-        {format === "minimal" && <MinimalCard cardRef={cardRef} config={config} {...sharedProps} />}
 
+        {/* ── Canvas-based animated formats (already 9:16) ── */}
         {format === "anim-count" && (
-          <AnimatedCountCard
-            canvasRef={animCanvasRef}
-            animKey={animKey}
-            config={config}
-            {...sharedProps}
-          />
+          <AnimatedCountCard canvasRef={animCanvasRef} animKey={animKey} config={config} {...sharedProps} />
         )}
-
         {format === "anim-ecg" && (
-          <AnimatedECGCard
-            canvasRef={animCanvasRef}
-            animKey={animKey}
-            config={config}
-            {...sharedProps}
-          />
+          <AnimatedECGCard canvasRef={animCanvasRef} animKey={animKey} config={config} {...sharedProps} />
         )}
-
         {format === "anim-flip" && (
-          <AnimatedFlipCard
-            canvasRef={animCanvasRef}
-            animKey={animKey}
-            config={config}
-            {...sharedProps}
-          />
+          <AnimatedFlipCard canvasRef={animCanvasRef} animKey={animKey} config={config} {...sharedProps} />
         )}
-
         {format === "anim-terminal" && (
-          <AnimatedTerminalCard
-            canvasRef={animCanvasRef}
-            animKey={animKey}
-            config={config}
-            {...sharedProps}
-          />
-        )}
-
-        {/* Overlay variants — checkerboard preview shows transparency */}
-        {(format === "overlay-clean" || format === "overlay-bar" || format === "overlay-bold" || format === "overlay-pills") && (
-          <div
-            className="rounded-2xl overflow-hidden"
-            style={{
-              backgroundImage: "repeating-conic-gradient(#1e1e1e 0% 25%, #0a0a0a 0% 50%)",
-              backgroundSize: "14px 14px",
-            }}
-          >
-            {format === "overlay-clean"  && <TransparentCard cardRef={cardRef} config={config} {...sharedProps} />}
-            {format === "overlay-bar"    && <OverlayBarCard cardRef={cardRef} config={config} {...sharedProps} />}
-            {format === "overlay-bold"   && <OverlayBoldCard cardRef={cardRef} config={config} {...sharedProps} />}
-            {format === "overlay-pills"  && <OverlayPillsCard cardRef={cardRef} config={config} {...sharedProps} />}
-          </div>
+          <AnimatedTerminalCard canvasRef={animCanvasRef} animKey={animKey} config={config} {...sharedProps} />
         )}
       </div>
 

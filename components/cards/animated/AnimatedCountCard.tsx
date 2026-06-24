@@ -21,9 +21,9 @@ export interface AnimatedCountCardProps {
   animKey?: number;
 }
 
-// Logical px → canvas px at 2× for crisp export
+// Logical px → canvas px at 2× for crisp export  (9:16 = 360×640)
 const LW = 360;
-const LH = 480;
+const LH = 640;
 const PR = 2;
 const CW = LW * PR;
 const CH = LH * PR;
@@ -228,7 +228,7 @@ export function AnimatedCountCard({
         width: "100%",
         aspectRatio: `${LW} / ${LH}`,
         display: "block",
-        borderRadius: 16,
+        borderRadius: 0,
       }}
     />
   );

@@ -112,6 +112,11 @@ body {
   border-radius: 4px;
 }
 
+/* ── Export wrapper: zero all child border-radii for clean PNG/video ─── */
+.export-wrap * {
+  border-radius: 0 !important;
+}
+
 /* ── Receipt printer animation ─────────────────────────────── */
 @keyframes receipt-print {
   0%   { transform: translateY(-100%); }
