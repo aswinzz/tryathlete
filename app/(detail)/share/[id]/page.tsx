@@ -9,6 +9,9 @@ import { NeonCard } from "@/components/cards/NeonCard";
 import { MinimalCard } from "@/components/cards/MinimalCard";
 import { RetroCard } from "@/components/cards/RetroCard";
 import { NightCard } from "@/components/cards/NightCard";
+import { OverlayBarCard } from "@/components/cards/OverlayBarCard";
+import { OverlayBoldCard } from "@/components/cards/OverlayBoldCard";
+import { OverlayPillsCard } from "@/components/cards/OverlayPillsCard";
 import { Button } from "@/components/ui/Button";
 import { Download, Share2, ArrowLeft } from "lucide-react";
 
@@ -36,17 +39,34 @@ interface Activity {
   }[];
 }
 
-type Format = "receipt" | "dark" | "story" | "transparent" | "neon" | "minimal" | "retro" | "night";
+type Format =
+  | "receipt" | "dark" | "neon" | "night" | "story" | "retro" | "minimal"
+  | "overlay-clean" | "overlay-bar" | "overlay-bold" | "overlay-pills";
 
-const FORMATS: { id: Format; label: string; hint: string; bg: string | null; swatchBg?: string; swatchText?: string }[] = [
-  { id: "receipt",     label: "Receipt",   hint: "Paper thermal receipt",           bg: "#FAFAF8", swatchBg: "#FAFAF8", swatchText: "#333" },
-  { id: "dark",        label: "Dark",      hint: "App-style dark card",             bg: "#0a0a0a", swatchBg: "#0a0a0a", swatchText: "rgba(255,255,255,0.6)" },
-  { id: "neon",        label: "Neon",      hint: "Dark card with lime accents",     bg: "#050505", swatchBg: "#050505", swatchText: "#c8ff00" },
-  { id: "night",       label: "Night",     hint: "Deep blue with indigo accents",   bg: "#080c18", swatchBg: "#080c18", swatchText: "#818cf8" },
-  { id: "story",       label: "Story",     hint: "9:16 portrait for Stories",       bg: "#0a0a0a", swatchBg: "#0a0a0a", swatchText: "#c8ff00" },
-  { id: "retro",       label: "Retro",     hint: "Newspaper column style",          bg: "#F2EDE4", swatchBg: "#F2EDE4", swatchText: "#1a1a1a" },
-  { id: "minimal",     label: "Minimal",   hint: "Clean white, modern",             bg: "#ffffff", swatchBg: "#ffffff", swatchText: "#0a0a0a" },
-  { id: "transparent", label: "Overlay",   hint: "Transparent — place over photo",  bg: null,      swatchBg: undefined, swatchText: "rgba(255,255,255,0.6)" },
+interface FormatDef {
+  id: Format;
+  label: string;
+  hint: string;
+  bg: string | null;
+  swatchBg?: string;
+  swatchText?: string;
+  group?: string;
+}
+
+const FORMATS: FormatDef[] = [
+  // — Cards —
+  { id: "receipt",      label: "Receipt",   hint: "Paper thermal receipt",          bg: "#FAFAF8", swatchBg: "#FAFAF8", swatchText: "#333",                   group: "Cards" },
+  { id: "dark",         label: "Dark",      hint: "App-style dark card",            bg: "#0a0a0a", swatchBg: "#0a0a0a", swatchText: "rgba(255,255,255,0.6)",   group: "Cards" },
+  { id: "neon",         label: "Neon",      hint: "Dark card, lime accents",        bg: "#050505", swatchBg: "#050505", swatchText: "#c8ff00",                 group: "Cards" },
+  { id: "night",        label: "Night",     hint: "Deep blue, indigo accents",      bg: "#080c18", swatchBg: "#080c18", swatchText: "#818cf8",                 group: "Cards" },
+  { id: "story",        label: "Story",     hint: "9:16 portrait for Stories",      bg: "#0a0a0a", swatchBg: "#0a0a0a", swatchText: "#c8ff00",                 group: "Cards" },
+  { id: "retro",        label: "Retro",     hint: "Newspaper column style",         bg: "#F2EDE4", swatchBg: "#F2EDE4", swatchText: "#1a1a1a",                 group: "Cards" },
+  { id: "minimal",      label: "Minimal",   hint: "Clean white, modern",            bg: "#ffffff", swatchBg: "#ffffff", swatchText: "#0a0a0a",                 group: "Cards" },
+  // — Overlays (transparent PNG, place over photos) —
+  { id: "overlay-clean", label: "Clean",    hint: "Overlay · centered with shadows",        bg: null, swatchBg: undefined, swatchText: "#fff",     group: "Overlay" },
+  { id: "overlay-bar",   label: "Bar",      hint: "Overlay · frosted bar at the bottom",    bg: null, swatchBg: undefined, swatchText: "#fff",     group: "Overlay" },
+  { id: "overlay-bold",  label: "Bold",     hint: "Overlay · giant number only",            bg: null, swatchBg: undefined, swatchText: "#c8ff00",  group: "Overlay" },
+  { id: "overlay-pills", label: "Pills",    hint: "Overlay · floating stat badges",         bg: null, swatchBg: undefined, swatchText: "#fff",     group: "Overlay" },
 ];
 
 export default function SharePage() {
@@ -165,48 +185,51 @@ export default function SharePage() {
 
       {/* Format picker */}
       <div className="px-5 mb-4">
-        <div className="flex gap-3 overflow-x-auto pb-1">
-          {FORMATS.map((f) => {
-            const isActive = format === f.id;
-            return (
-              <button
-                key={f.id}
-                onClick={() => setFormat(f.id)}
-                className="flex-shrink-0 flex flex-col items-center gap-1.5"
-              >
-                {/* Swatch */}
-                <div
-                  className="w-14 h-14 rounded-xl flex items-center justify-center transition-all"
-                  style={{
-                    background: f.swatchBg ?? undefined,
-                    backgroundImage: !f.bg
-                      ? "repeating-conic-gradient(#222 0% 25%, #111 0% 50%)"
-                      : undefined,
-                    backgroundSize: !f.bg ? "10px 10px" : undefined,
-                    border: isActive
-                      ? "2px solid var(--accent)"
-                      : "2px solid var(--surface-3)",
-                    boxShadow: isActive ? "0 0 0 1px var(--accent)" : "none",
-                  }}
-                >
-                  <span
-                    className="text-[11px] font-black"
-                    style={{ color: f.swatchText ?? "rgba(255,255,255,0.6)" }}
-                  >
-                    KM
-                  </span>
-                </div>
-                <span
-                  className="text-[10px] font-semibold"
-                  style={{ color: isActive ? "var(--accent)" : "var(--text-3)" }}
-                >
-                  {f.label}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-        <p className="text-[10px] text-[var(--text-3)] mt-2 uppercase tracking-widest">
+        {(["Cards", "Overlay"] as const).map((group) => {
+          const groupFormats = FORMATS.filter((f) => f.group === group);
+          return (
+            <div key={group} className="mb-3">
+              <p className="text-[9px] font-bold text-[var(--text-3)] uppercase tracking-widest mb-2">
+                {group === "Overlay" ? "Overlay (transparent PNG)" : group}
+              </p>
+              <div className="flex gap-3 overflow-x-auto pb-1">
+                {groupFormats.map((f) => {
+                  const isActive = format === f.id;
+                  return (
+                    <button
+                      key={f.id}
+                      onClick={() => setFormat(f.id)}
+                      className="flex-shrink-0 flex flex-col items-center gap-1.5"
+                    >
+                      <div
+                        className="w-14 h-14 rounded-xl flex items-center justify-center transition-all"
+                        style={{
+                          background: f.swatchBg ?? undefined,
+                          backgroundImage: !f.bg
+                            ? "repeating-conic-gradient(#222 0% 25%, #111 0% 50%)"
+                            : undefined,
+                          backgroundSize: !f.bg ? "10px 10px" : undefined,
+                          border: isActive
+                            ? "2px solid var(--accent)"
+                            : "2px solid var(--surface-3)",
+                          boxShadow: isActive ? "0 0 0 1px var(--accent)" : "none",
+                        }}
+                      >
+                        <span className="text-[11px] font-black" style={{ color: f.swatchText ?? "rgba(255,255,255,0.6)" }}>
+                          KM
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-semibold" style={{ color: isActive ? "var(--accent)" : "var(--text-3)" }}>
+                        {f.label}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+        <p className="text-[10px] text-[var(--text-3)] mt-1 uppercase tracking-widest">
           {activeFormat.hint}
         </p>
       </div>
@@ -222,7 +245,9 @@ export default function SharePage() {
         {format === "story" && <StoryCard cardRef={cardRef} {...sharedProps} />}
         {format === "retro" && <RetroCard cardRef={cardRef} {...sharedProps} />}
         {format === "minimal" && <MinimalCard cardRef={cardRef} {...sharedProps} />}
-        {format === "transparent" && (
+
+        {/* Overlay variants — checkerboard preview shows transparency */}
+        {(format === "overlay-clean" || format === "overlay-bar" || format === "overlay-bold" || format === "overlay-pills") && (
           <div
             className="rounded-2xl overflow-hidden"
             style={{
@@ -230,7 +255,10 @@ export default function SharePage() {
               backgroundSize: "14px 14px",
             }}
           >
-            <TransparentCard cardRef={cardRef} {...sharedProps} />
+            {format === "overlay-clean"  && <TransparentCard cardRef={cardRef} {...sharedProps} />}
+            {format === "overlay-bar"    && <OverlayBarCard cardRef={cardRef} {...sharedProps} />}
+            {format === "overlay-bold"   && <OverlayBoldCard cardRef={cardRef} {...sharedProps} />}
+            {format === "overlay-pills"  && <OverlayPillsCard cardRef={cardRef} {...sharedProps} />}
           </div>
         )}
       </div>
