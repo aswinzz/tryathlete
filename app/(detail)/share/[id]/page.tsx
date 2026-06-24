@@ -5,6 +5,10 @@ import { RunReceipt } from "@/components/receipt/RunReceipt";
 import { DarkCard } from "@/components/cards/DarkCard";
 import { StoryCard } from "@/components/cards/StoryCard";
 import { TransparentCard } from "@/components/cards/TransparentCard";
+import { NeonCard } from "@/components/cards/NeonCard";
+import { MinimalCard } from "@/components/cards/MinimalCard";
+import { RetroCard } from "@/components/cards/RetroCard";
+import { NightCard } from "@/components/cards/NightCard";
 import { Button } from "@/components/ui/Button";
 import { Download, Share2, ArrowLeft } from "lucide-react";
 
@@ -32,13 +36,17 @@ interface Activity {
   }[];
 }
 
-type Format = "receipt" | "dark" | "story" | "transparent";
+type Format = "receipt" | "dark" | "story" | "transparent" | "neon" | "minimal" | "retro" | "night";
 
-const FORMATS: { id: Format; label: string; hint: string; bg: string | null }[] = [
-  { id: "receipt",     label: "Receipt",     hint: "Paper thermal receipt",  bg: "#FAFAF8" },
-  { id: "dark",        label: "Dark",        hint: "App-style dark card",    bg: "#0a0a0a" },
-  { id: "story",       label: "Story",       hint: "9:16 Instagram Story",   bg: "#0a0a0a" },
-  { id: "transparent", label: "Overlay",     hint: "Transparent — place over your photo", bg: null },
+const FORMATS: { id: Format; label: string; hint: string; bg: string | null; swatchBg?: string; swatchText?: string }[] = [
+  { id: "receipt",     label: "Receipt",   hint: "Paper thermal receipt",           bg: "#FAFAF8", swatchBg: "#FAFAF8", swatchText: "#333" },
+  { id: "dark",        label: "Dark",      hint: "App-style dark card",             bg: "#0a0a0a", swatchBg: "#0a0a0a", swatchText: "rgba(255,255,255,0.6)" },
+  { id: "neon",        label: "Neon",      hint: "Dark card with lime accents",     bg: "#050505", swatchBg: "#050505", swatchText: "#c8ff00" },
+  { id: "night",       label: "Night",     hint: "Deep blue with indigo accents",   bg: "#080c18", swatchBg: "#080c18", swatchText: "#818cf8" },
+  { id: "story",       label: "Story",     hint: "9:16 portrait for Stories",       bg: "#0a0a0a", swatchBg: "#0a0a0a", swatchText: "#c8ff00" },
+  { id: "retro",       label: "Retro",     hint: "Newspaper column style",          bg: "#F2EDE4", swatchBg: "#F2EDE4", swatchText: "#1a1a1a" },
+  { id: "minimal",     label: "Minimal",   hint: "Clean white, modern",             bg: "#ffffff", swatchBg: "#ffffff", swatchText: "#0a0a0a" },
+  { id: "transparent", label: "Overlay",   hint: "Transparent — place over photo",  bg: null,      swatchBg: undefined, swatchText: "rgba(255,255,255,0.6)" },
 ];
 
 export default function SharePage() {
@@ -170,7 +178,7 @@ export default function SharePage() {
                 <div
                   className="w-14 h-14 rounded-xl flex items-center justify-center transition-all"
                   style={{
-                    background: f.bg ?? undefined,
+                    background: f.swatchBg ?? undefined,
                     backgroundImage: !f.bg
                       ? "repeating-conic-gradient(#222 0% 25%, #111 0% 50%)"
                       : undefined,
@@ -183,7 +191,7 @@ export default function SharePage() {
                 >
                   <span
                     className="text-[11px] font-black"
-                    style={{ color: f.bg === "#FAFAF8" ? "#333" : "rgba(255,255,255,0.6)" }}
+                    style={{ color: f.swatchText ?? "rgba(255,255,255,0.6)" }}
                   >
                     KM
                   </span>
@@ -206,18 +214,14 @@ export default function SharePage() {
       {/* Card preview */}
       <div className="flex-1 overflow-y-auto px-5 pb-4">
         {format === "receipt" && (
-          <RunReceipt
-            receiptRef={cardRef}
-            orderNumber={activity.id.slice(-4).toUpperCase()}
-            {...sharedProps}
-          />
+          <RunReceipt receiptRef={cardRef} orderNumber={activity.id.slice(-4).toUpperCase()} {...sharedProps} />
         )}
-        {format === "dark" && (
-          <DarkCard cardRef={cardRef} {...sharedProps} />
-        )}
-        {format === "story" && (
-          <StoryCard cardRef={cardRef} {...sharedProps} />
-        )}
+        {format === "dark" && <DarkCard cardRef={cardRef} {...sharedProps} />}
+        {format === "neon" && <NeonCard cardRef={cardRef} {...sharedProps} />}
+        {format === "night" && <NightCard cardRef={cardRef} {...sharedProps} />}
+        {format === "story" && <StoryCard cardRef={cardRef} {...sharedProps} />}
+        {format === "retro" && <RetroCard cardRef={cardRef} {...sharedProps} />}
+        {format === "minimal" && <MinimalCard cardRef={cardRef} {...sharedProps} />}
         {format === "transparent" && (
           <div
             className="rounded-2xl overflow-hidden"
