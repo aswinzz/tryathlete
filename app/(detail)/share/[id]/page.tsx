@@ -335,14 +335,21 @@ export default function SharePage() {
       return 0;
     }
 
-    // Centre receipt horizontally within the 9:16 canvas
-    const receiptDrawX = Math.round((canvasW - receiptImg.width) / 2);
-    const PRINTER_PX   = PRINTER_H * 2; // 70 * 2 = 140 canvas px
+    const PRINTER_PX = PRINTER_H * 2; // 70 * 2 = 140 canvas px
+
+    // Scale receipt to fit within the canvas area below the printer.
+    // Long receipts (many laps / stats) can exceed 1140px at 2× — without scaling
+    // the bottom would be silently clipped in the exported video.
+    const maxReceiptH = canvasH - PRINTER_PX; // 1140 canvas px
+    const receiptScale = Math.min(1, maxReceiptH / receiptImg.height);
+    const drawW = Math.round(receiptImg.width * receiptScale);
+    const drawH = Math.round(receiptImg.height * receiptScale);
+    const receiptDrawX = Math.round((canvasW - drawW) / 2);
 
     // ── Step 5: draw first frame then start recording ─────────────────────
     ctx.fillStyle = "#FAFAF8";
     ctx.fillRect(0, 0, canvasW, canvasH);
-    ctx.drawImage(receiptImg, receiptDrawX, PRINTER_PX + getYFraction(0) * receiptImg.height);
+    ctx.drawImage(receiptImg, receiptDrawX, PRINTER_PX + getYFraction(0) * drawH, drawW, drawH);
     drawPrinter(true);
 
     recorder.start();
@@ -358,15 +365,15 @@ export default function SharePage() {
         const elapsed = now - startTime;
         if (elapsed >= RECORD_MS) { resolve(); return; }
 
-        const yPx = getYFraction(elapsed) * receiptImg.height;
+        const yPx = getYFraction(elapsed) * drawH;
         const blinkOn = elapsed < ANIM_MS && Math.floor(elapsed / 300) % 2 === 0;
 
         // Background — cream to match receipt
         ctx.fillStyle = "#FAFAF8";
         ctx.fillRect(0, 0, canvasW, canvasH);
 
-        // Receipt centred horizontally, animated vertically
-        ctx.drawImage(receiptImg, receiptDrawX, PRINTER_PX + yPx);
+        // Receipt centred horizontally, animated vertically (scaled to fit)
+        ctx.drawImage(receiptImg, receiptDrawX, PRINTER_PX + yPx, drawW, drawH);
 
         // Scan-line glow at the printer slot — new content emerges through here
         if (elapsed < ANIM_MS) {
@@ -846,39 +853,39 @@ export default function SharePage() {
         {/* ── Receipt animation ── */}
         {isReceiptAnim && (
           <div style={{ position: "relative" }}>
-            {/* Printer body */}
-            <div style={{
-              background: "linear-gradient(180deg, #1d1d1d 0%, #141414 100%)",
-              borderRadius: "16px 16px 2px 2px",
-              padding: "14px 20px 12px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              position: "relative",
-              zIndex: 10,
-              boxShadow: "0 6px 20px rgba(0,0,0,0.5)",
-            }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <div style={{ width: 36, height: 2, background: "#2e2e2e", borderRadius: 1 }} />
-                <div style={{ width: 28, height: 2, background: "#252525", borderRadius: 1 }} />
-                <div style={{ width: 32, height: 2, background: "#2e2e2e", borderRadius: 1 }} />
-              </div>
-              <span style={{ fontFamily: "monospace", fontSize: 8, color: "#3a3a3a", letterSpacing: "0.16em", textTransform: "uppercase" }}>
-                THERMAL PRINTER
-              </span>
+            {/* Printer body + roller wrapped together so they stick as one unit */}
+            <div style={{ position: "sticky", top: 0, zIndex: 10 }}>
               <div style={{
-                width: 8, height: 8, borderRadius: "50%",
-                background: "#c8ff00", boxShadow: "0 0 7px rgba(200,255,0,0.9)",
-                animation: "printer-blink 0.6s ease-in-out 14",
+                background: "linear-gradient(180deg, #1d1d1d 0%, #141414 100%)",
+                borderRadius: "16px 16px 2px 2px",
+                padding: "14px 20px 12px",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                boxShadow: "0 6px 20px rgba(0,0,0,0.5)",
+              }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  <div style={{ width: 36, height: 2, background: "#2e2e2e", borderRadius: 1 }} />
+                  <div style={{ width: 28, height: 2, background: "#252525", borderRadius: 1 }} />
+                  <div style={{ width: 32, height: 2, background: "#2e2e2e", borderRadius: 1 }} />
+                </div>
+                <span style={{ fontFamily: "monospace", fontSize: 8, color: "#3a3a3a", letterSpacing: "0.16em", textTransform: "uppercase" }}>
+                  THERMAL PRINTER
+                </span>
+                <div style={{
+                  width: 8, height: 8, borderRadius: "50%",
+                  background: "#c8ff00", boxShadow: "0 0 7px rgba(200,255,0,0.9)",
+                  animation: "printer-blink 0.6s ease-in-out 14",
+                }} />
+              </div>
+              {/* Paper slot roller — immediately below, no gap */}
+              <div style={{
+                height: 6,
+                background: "repeating-linear-gradient(90deg, #0f0f0f 0px, #0f0f0f 4px, #111 4px, #111 8px)",
+                animation: "printer-roller 0.08s linear infinite",
+                animationIterationCount: "30",
               }} />
             </div>
-            {/* Paper slot roller */}
-            <div style={{
-              height: 6, position: "relative", zIndex: 10,
-              background: "repeating-linear-gradient(90deg, #0f0f0f 0px, #0f0f0f 4px, #111 4px, #111 8px)",
-              animation: "printer-roller 0.08s linear infinite",
-              animationIterationCount: "30",
-            }} />
             {/* Animated receipt */}
             <div
               key={receiptKey}
