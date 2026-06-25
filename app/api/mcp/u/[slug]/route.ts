@@ -192,6 +192,94 @@ const TOOLS = [
       required: ["planId", "weekNumber", "dayOfWeek"],
     },
   },
+  {
+    name: "create_week",
+    description: "Create a full week with all its days and workout entries in a single call. Prefer this over calling add_week + add_day + add_entry separately.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        planId: { type: "string" },
+        weekNumber: { type: "number" },
+        type: { type: "string", enum: ["REGULAR", "PEAK", "TAPER", "RECOVERY", "DELOAD"], description: "Default: REGULAR" },
+        notes: { type: "string", description: "Optional coach notes for the week" },
+        days: {
+          type: "array",
+          description: "Days to create in this week",
+          items: {
+            type: "object",
+            properties: {
+              dayOfWeek: { type: "number", description: "1=Monday … 7=Sunday" },
+              type: { type: "string", enum: ["REGULAR", "RACE", "REST", "RECOVERY"], description: "Default: REGULAR" },
+              coachNotes: { type: "string" },
+              entries: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    type: { type: "string", enum: ["RUN", "CYCLING", "SWIMMING", "STRENGTH", "HIIT", "OTHER"] },
+                    title: { type: "string" },
+                    description: { type: "string" },
+                    durationMin: { type: "number" },
+                  },
+                  required: ["type", "title"],
+                },
+              },
+            },
+            required: ["dayOfWeek"],
+          },
+        },
+      },
+      required: ["planId", "weekNumber", "days"],
+    },
+  },
+  {
+    name: "populate_plan",
+    description: "Populate an entire plan with multiple weeks, days and entries in one call. Use this to build a full training plan at once. Strongly preferred over making individual add_week/add_day/add_entry calls.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        planId: { type: "string" },
+        weeks: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              weekNumber: { type: "number" },
+              type: { type: "string", enum: ["REGULAR", "PEAK", "TAPER", "RECOVERY", "DELOAD"] },
+              notes: { type: "string" },
+              days: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    dayOfWeek: { type: "number", description: "1=Monday … 7=Sunday" },
+                    type: { type: "string", enum: ["REGULAR", "RACE", "REST", "RECOVERY"] },
+                    coachNotes: { type: "string" },
+                    entries: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          type: { type: "string", enum: ["RUN", "CYCLING", "SWIMMING", "STRENGTH", "HIIT", "OTHER"] },
+                          title: { type: "string" },
+                          description: { type: "string" },
+                          durationMin: { type: "number" },
+                        },
+                        required: ["type", "title"],
+                      },
+                    },
+                  },
+                  required: ["dayOfWeek"],
+                },
+              },
+            },
+            required: ["weekNumber", "days"],
+          },
+        },
+      },
+      required: ["planId", "weeks"],
+    },
+  },
 ];
 
 // ─── Tool implementations ─────────────────────────────────────────────────────
@@ -383,6 +471,79 @@ async function callTool(
       });
       const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
       return { message: `${DOW[day.dayOfWeek - 1]} of week ${week.weekNumber} marked as completed ✅` };
+    }
+
+    case "create_week": {
+      const { planId, weekNumber, type, notes, days } = args as {
+        planId: string; weekNumber: number; type?: string; notes?: string;
+        days: { dayOfWeek: number; type?: string; coachNotes?: string; entries?: { type: string; title: string; description?: string; durationMin?: number }[] }[];
+      };
+
+      // Upsert week
+      const week = await prisma.workoutWeek.upsert({
+        where: { planId_weekNumber: { planId, weekNumber } },
+        update: { type: (type as WeekType) || WeekType.REGULAR, notes: notes || null },
+        create: { planId, weekNumber, type: (type as WeekType) || WeekType.REGULAR, notes: notes || null },
+      });
+
+      let totalEntries = 0;
+      for (const d of days) {
+        const day = await prisma.workoutDay.upsert({
+          where: { weekId_dayOfWeek: { weekId: week.id, dayOfWeek: d.dayOfWeek } },
+          update: { type: (d.type as DayType) || DayType.REGULAR, coachNotes: d.coachNotes || null },
+          create: { weekId: week.id, dayOfWeek: d.dayOfWeek, type: (d.type as DayType) || DayType.REGULAR, status: DayStatus.PLANNED, coachNotes: d.coachNotes || null },
+        });
+        if (d.entries) {
+          for (let i = 0; i < d.entries.length; i++) {
+            const e = d.entries[i];
+            await prisma.workoutEntry.create({
+              data: { dayId: day.id, type: (e.type as EntryType) || EntryType.OTHER, title: e.title, description: e.description || null, durationMin: e.durationMin || null, orderIndex: i },
+            });
+            totalEntries++;
+          }
+        }
+      }
+
+      return { message: `Week ${weekNumber} created with ${days.length} days and ${totalEntries} entries` };
+    }
+
+    case "populate_plan": {
+      const { planId, weeks } = args as {
+        planId: string;
+        weeks: { weekNumber: number; type?: string; notes?: string; days: { dayOfWeek: number; type?: string; coachNotes?: string; entries?: { type: string; title: string; description?: string; durationMin?: number }[] }[] }[];
+      };
+
+      let totalWeeks = 0, totalDays = 0, totalEntries = 0;
+
+      for (const w of weeks) {
+        const week = await prisma.workoutWeek.upsert({
+          where: { planId_weekNumber: { planId, weekNumber: w.weekNumber } },
+          update: { type: (w.type as WeekType) || WeekType.REGULAR, notes: w.notes || null },
+          create: { planId, weekNumber: w.weekNumber, type: (w.type as WeekType) || WeekType.REGULAR, notes: w.notes || null },
+        });
+        totalWeeks++;
+
+        for (const d of w.days) {
+          const day = await prisma.workoutDay.upsert({
+            where: { weekId_dayOfWeek: { weekId: week.id, dayOfWeek: d.dayOfWeek } },
+            update: { type: (d.type as DayType) || DayType.REGULAR, coachNotes: d.coachNotes || null },
+            create: { weekId: week.id, dayOfWeek: d.dayOfWeek, type: (d.type as DayType) || DayType.REGULAR, status: DayStatus.PLANNED, coachNotes: d.coachNotes || null },
+          });
+          totalDays++;
+
+          if (d.entries) {
+            for (let i = 0; i < d.entries.length; i++) {
+              const e = d.entries[i];
+              await prisma.workoutEntry.create({
+                data: { dayId: day.id, type: (e.type as EntryType) || EntryType.OTHER, title: e.title, description: e.description || null, durationMin: e.durationMin || null, orderIndex: i },
+              });
+              totalEntries++;
+            }
+          }
+        }
+      }
+
+      return { message: `Plan populated: ${totalWeeks} weeks, ${totalDays} days, ${totalEntries} entries created` };
     }
 
     default:
