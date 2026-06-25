@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { randomBytes } from "crypto";
+import { headers } from "next/headers";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { CopyButton } from "@/components/plans/CopyButton";
@@ -27,9 +28,10 @@ export default async function ClaudeSetupPage() {
   }
 
   const slug = user!.name?.toLowerCase().replace(/\s+/g, "") || userId.slice(0, 8);
-  // In production this hits the app's own domain; swap host for a custom subdomain later
-  const host = process.env.NEXTAUTH_URL || "https://tryathlete.com";
-  const mcpUrl = `${host}/api/mcp/u/${slug}?token=${user!.mcpToken}`;
+  const hdrs = await headers();
+  const host = hdrs.get("host") ?? "tryathlete.com";
+  const proto = hdrs.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
+  const mcpUrl = `${proto}://${host}/api/mcp/u/${slug}?token=${user!.mcpToken}`;
   const configJson = JSON.stringify(
     { mcpServers: { tryathlete: { url: mcpUrl } } },
     null,
