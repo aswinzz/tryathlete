@@ -2,6 +2,18 @@ import { GarminConnect } from "garmin-connect";
 import { prisma } from "./prisma";
 import { downsample } from "./routeUtils";
 
+/**
+ * Parse a Garmin time string (e.g. "2024-03-15 07:30:00") as UTC.
+ * Garmin returns both startTimeGMT and startTimeLocal without a timezone suffix.
+ * We always prefer startTimeGMT (which is truly UTC) and append "Z" so the JS
+ * Date constructor treats it unambiguously as UTC — not the server's local timezone.
+ */
+function parseGarminTime(raw: string | undefined | null): Date {
+  if (!raw) return new Date();
+  // Replace space separator with T and append Z to force UTC interpretation
+  return new Date(raw.replace(" ", "T") + "Z");
+}
+
 export async function getGarminClient(userId: string) {
   const conn = await prisma.trackerConnection.findUnique({
     where: { userId_provider: { userId, provider: "garmin" } },
@@ -78,7 +90,7 @@ export async function syncGarminActivities(userId: string) {
         garminId,
         name: act.activityName || "Activity",
         type: act.activityType?.typeKey || "running",
-        startTime: new Date(act.startTimeLocal || act.startTimeGMT),
+        startTime: parseGarminTime(act.startTimeGMT || act.startTimeLocal),
         duration: Math.round(act.duration || 0),
         distance: act.distance || null,
         calories: act.calories || null,
@@ -113,7 +125,7 @@ export async function syncGarminActivities(userId: string) {
             maxHeartRate: lap.maxHR || null,
             avgPace: lapPace,
             zone,
-            startTime: lap.startTimeLocal ? new Date(lap.startTimeLocal) : null,
+            startTime: lap.startTimeLocal ? parseGarminTime(lap.startTimeLocal) : null,
           },
         });
       }
