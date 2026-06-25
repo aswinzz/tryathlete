@@ -1,13 +1,13 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutGrid, Activity, Star, User } from "lucide-react";
+import { LayoutGrid, Activity, CalendarDays, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV = [
   { href: "/dashboard", icon: LayoutGrid, label: "Feed" },
   { href: "/activity", icon: Activity, label: "Activity" },
-  { href: "/explore", icon: Star, label: "Explore" },
+  { href: "/plans", icon: CalendarDays, label: "Plans" },
   { href: "/profile", icon: User, label: "Profile" },
 ];
 

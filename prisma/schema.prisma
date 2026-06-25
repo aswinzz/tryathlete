@@ -21,6 +21,9 @@ model User {
   sessions    Session[]
   activities  Activity[]
   connections TrackerConnection[]
+  workoutPlans WorkoutPlan[]
+
+  mcpToken    String?  @unique // auth token for MCP endpoint
 }
 
 model Account {
@@ -99,6 +102,99 @@ model Activity {
   user User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   laps ActivityLap[]
 }
+
+// ─── Workout Plan ────────────────────────────────────────────────────────────
+
+enum WeekType {
+  REGULAR
+  PEAK
+  TAPER
+  RECOVERY
+  DELOAD
+}
+
+enum DayType {
+  REGULAR
+  RACE
+  REST
+  RECOVERY
+}
+
+enum DayStatus {
+  PLANNED
+  COMPLETED
+  SKIPPED
+  PARTIAL
+}
+
+enum EntryType {
+  RUN
+  CYCLING
+  SWIMMING
+  STRENGTH
+  HIIT
+  OTHER
+}
+
+model WorkoutPlan {
+  id          String   @id @default(cuid())
+  userId      String
+  title       String
+  description String?
+  startDate   DateTime?
+  endDate     DateTime?
+  isActive    Boolean  @default(false)
+  isDraft     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  weeks WorkoutWeek[]
+}
+
+model WorkoutWeek {
+  id          String   @id @default(cuid())
+  planId      String
+  weekNumber  Int      // 1-based
+  type        WeekType @default(REGULAR)
+  title       String?
+  notes       String?
+
+  plan WorkoutPlan  @relation(fields: [planId], references: [id], onDelete: Cascade)
+  days WorkoutDay[]
+
+  @@unique([planId, weekNumber])
+}
+
+model WorkoutDay {
+  id          String    @id @default(cuid())
+  weekId      String
+  dayOfWeek   Int       // 1=Mon … 7=Sun
+  type        DayType   @default(REGULAR)
+  status      DayStatus @default(PLANNED)
+  coachNotes  String?
+  completedAt DateTime?
+
+  week    WorkoutWeek    @relation(fields: [weekId], references: [id], onDelete: Cascade)
+  entries WorkoutEntry[]
+
+  @@unique([weekId, dayOfWeek])
+}
+
+model WorkoutEntry {
+  id          String    @id @default(cuid())
+  dayId       String
+  type        EntryType @default(OTHER)
+  title       String
+  description String?   // freeform: stations, sets, instructions etc.
+  durationMin Int?      // optional planned duration in minutes
+  orderIndex  Int       @default(0)
+  createdAt   DateTime  @default(now())
+
+  day WorkoutDay @relation(fields: [dayId], references: [id], onDelete: Cascade)
+}
+
+// ─── Activity Laps ────────────────────────────────────────────────────────────
 
 model ActivityLap {
   id           String   @id @default(cuid())
