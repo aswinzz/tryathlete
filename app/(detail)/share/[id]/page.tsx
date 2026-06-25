@@ -16,6 +16,9 @@ import { AnimatedCountCard, ANIM_COUNT_DURATION } from "@/components/cards/anima
 import { AnimatedECGCard, ANIM_ECG_DURATION } from "@/components/cards/animated/AnimatedECGCard";
 import { AnimatedFlipCard, ANIM_FLIP_DURATION } from "@/components/cards/animated/AnimatedFlipCard";
 import { AnimatedTerminalCard, ANIM_TERMINAL_DURATION } from "@/components/cards/animated/AnimatedTerminalCard";
+import { AnimatedRouteCard, ANIM_ROUTE_DURATION } from "@/components/cards/animated/AnimatedRouteCard";
+import { RouteCard } from "@/components/cards/RouteCard";
+import type { RoutePoint } from "@/lib/routeUtils";
 import { Button } from "@/components/ui/Button";
 import { Download, Share2, ArrowLeft } from "lucide-react";
 import { toMp4 } from "@/lib/ffmpegConvert";
@@ -43,6 +46,7 @@ interface Activity {
   calories: number | null;
   elevGain: number | null;
   steps: number | null;
+  routePoints: string | null;
   laps: {
     lapIndex: number;
     distance: number;
@@ -54,9 +58,9 @@ interface Activity {
 }
 
 type Format =
-  | "receipt" | "dark" | "neon" | "night" | "story" | "retro" | "minimal"
+  | "receipt" | "dark" | "neon" | "night" | "story" | "retro" | "minimal" | "route"
   | "overlay-clean" | "overlay-bar" | "overlay-bold" | "overlay-pills"
-  | "receipt-anim" | "anim-count" | "anim-ecg" | "anim-flip" | "anim-terminal";
+  | "receipt-anim" | "anim-count" | "anim-ecg" | "anim-flip" | "anim-terminal" | "anim-route";
 
 interface FormatDef {
   id: Format;
@@ -77,12 +81,14 @@ const FORMATS: FormatDef[] = [
   { id: "story",        label: "Story",     hint: "9:16 portrait for Stories",      bg: "#0a0a0a", swatchBg: "#0a0a0a", swatchText: "#c8ff00",                 group: "Cards" },
   { id: "retro",        label: "Retro",     hint: "Newspaper column style",         bg: "#F2EDE4", swatchBg: "#F2EDE4", swatchText: "#1a1a1a",                 group: "Cards" },
   { id: "minimal",      label: "Minimal",   hint: "Clean white, modern",            bg: "#ffffff", swatchBg: "#ffffff", swatchText: "#0a0a0a",                 group: "Cards" },
+  { id: "route",        label: "Route",     hint: "GPS route map with stats",       bg: "#060911", swatchBg: "#060911", swatchText: "#c8ff00",                 group: "Cards" },
   // — Animated (saves as video) —
   { id: "receipt-anim", label: "Receipt",   hint: "Printer animation · saves as video", bg: "#FAFAF8", swatchBg: "#FAFAF8", swatchText: "#c8ff00",            group: "Animated" },
   { id: "anim-count",   label: "Odometer",  hint: "Stats count up from zero",           bg: "#0a0a0a", swatchBg: "#0a0a0a", swatchText: "#c8ff00",            group: "Animated" },
   { id: "anim-ecg",    label: "ECG",       hint: "Heartbeat trace then stats reveal",  bg: "#04090a", swatchBg: "#04090a", swatchText: "#c8ff00",            group: "Animated" },
   { id: "anim-flip",     label: "Scoreboard", hint: "Split-flap digits flip to your stat",   bg: "#0a0a0a", swatchBg: "#0a0a0a", swatchText: "#c8ff00",   group: "Animated" },
   { id: "anim-terminal", label: "Terminal",   hint: "Stats type out like a terminal command", bg: "#000d02", swatchBg: "#000d02", swatchText: "#00e040",   group: "Animated" },
+  { id: "anim-route",   label: "Route",     hint: "GPS route traces itself on screen",        bg: "#060911", swatchBg: "#060911", swatchText: "#c8ff00",   group: "Animated" },
   // — Overlays (transparent PNG, place over photos) —
   { id: "overlay-clean", label: "Clean",    hint: "Overlay · centered with shadows",        bg: null, swatchBg: undefined, swatchText: "#fff",     group: "Overlay" },
   { id: "overlay-bar",   label: "Bar",      hint: "Overlay · frosted bar at the bottom",    bg: null, swatchBg: undefined, swatchText: "#fff",     group: "Overlay" },
@@ -109,7 +115,7 @@ export default function SharePage() {
   const exportWrapperRef = useRef<HTMLDivElement>(null); // 9:16 wrapper — captured for static PNGs
   const animCanvasRef = useRef<HTMLCanvasElement>(null);
 
-  const CANVAS_ANIM_FORMATS: Format[] = ["anim-count", "anim-ecg", "anim-flip", "anim-terminal"];
+  const CANVAS_ANIM_FORMATS: Format[] = ["anim-count", "anim-ecg", "anim-flip", "anim-terminal", "anim-route"];
 
   function handleFormatChange(f: Format) {
     if (f === "receipt-anim") setReceiptKey((k) => k + 1);
@@ -437,10 +443,11 @@ export default function SharePage() {
   }
 
   function animVideoDuration(): number {
-    if (format === "anim-count") return ANIM_COUNT_DURATION + 500;
-    if (format === "anim-ecg")   return ANIM_ECG_DURATION   + 500;
+    if (format === "anim-count")    return ANIM_COUNT_DURATION    + 500;
+    if (format === "anim-ecg")      return ANIM_ECG_DURATION      + 500;
     if (format === "anim-flip")     return ANIM_FLIP_DURATION     + 500;
     if (format === "anim-terminal") return ANIM_TERMINAL_DURATION + 500;
+    if (format === "anim-route")    return ANIM_ROUTE_DURATION    + 500;
     return 6500;
   }
 
@@ -541,6 +548,14 @@ export default function SharePage() {
     );
   }
 
+  // Parse stored GPS route (string → RoutePoint[])
+  let parsedRoutePoints: RoutePoint[] | null = null;
+  try {
+    if (activity.routePoints) {
+      parsedRoutePoints = JSON.parse(activity.routePoints) as RoutePoint[];
+    }
+  } catch { /* ignore */ }
+
   const sharedProps = {
     name: activity.name,
     type: activity.type,
@@ -555,6 +570,7 @@ export default function SharePage() {
     elevGain: activity.elevGain,
     steps: activity.steps,
     laps: activity.laps,
+    routePoints: parsedRoutePoints,
   };
 
   return (
@@ -678,7 +694,15 @@ export default function SharePage() {
           steps: activity.steps,
         };
         const heroOptions = availableHeroOptions(activityData);
-        const showToggles = availableShowToggles(activityData);
+        // Laps (splits table) only applies to static dark/neon/night/minimal/retro cards
+        const LAPS_FORMATS: Format[] = ["receipt", "receipt-anim", "dark", "neon", "night", "minimal", "retro"];
+        // Route map applies to all formats except pure canvas animations without overlay
+        const ROUTE_FORMATS: Format[] = ["receipt", "receipt-anim", "dark", "neon", "night", "minimal", "retro", "story", "route", "overlay-clean", "overlay-bar", "overlay-bold", "overlay-pills", "anim-count", "anim-ecg", "anim-flip", "anim-terminal", "anim-route"];
+        const showToggles = availableShowToggles(activityData, {
+          formatSupportsLaps: LAPS_FORMATS.includes(format),
+          formatSupportsRoute: ROUTE_FORMATS.includes(format),
+          hasRoute: !!parsedRoutePoints,
+        });
         return (
           <div className="px-5 mb-4 space-y-3">
             {/* Title display mode */}
@@ -753,7 +777,7 @@ export default function SharePage() {
 
         {/* ── Receipt: natural height preview (export composes onto 9:16 canvas) ── */}
         {format === "receipt" && (
-          <RunReceipt receiptRef={cardRef} orderNumber={activity.id.slice(-4).toUpperCase()} {...sharedProps} />
+          <RunReceipt receiptRef={cardRef} orderNumber={activity.id.slice(-4).toUpperCase()} config={config} {...sharedProps} />
         )}
 
         {/* ── Other static card formats — wrapped in a 9:16 export container ── */}
@@ -778,6 +802,7 @@ export default function SharePage() {
             {format === "story"   && <StoryCard   cardRef={cardRef} config={config} {...sharedProps} />}
             {format === "retro"   && <RetroCard   cardRef={cardRef} config={config} {...sharedProps} />}
             {format === "minimal" && <MinimalCard cardRef={cardRef} config={config} {...sharedProps} />}
+            {format === "route"   && <RouteCard   cardRef={cardRef} config={config} {...sharedProps} />}
 
             {/* Overlay variants — checkerboard is preview-only (excluded from PNG export) */}
             {(format === "overlay-clean" || format === "overlay-bar" || format === "overlay-bold" || format === "overlay-pills") && (
@@ -850,7 +875,7 @@ export default function SharePage() {
                 background: "linear-gradient(180deg, rgba(200,255,0,0.08) 0%, rgba(200,255,0,0.04) 60%, transparent 100%)",
                 animation: "receipt-scan 4.5s linear both",
               }} />
-              <RunReceipt receiptRef={cardRef} orderNumber={activity.id.slice(-4).toUpperCase()} {...sharedProps} />
+              <RunReceipt receiptRef={cardRef} orderNumber={activity.id.slice(-4).toUpperCase()} config={config} {...sharedProps} />
             </div>
           </div>
         )}
@@ -867,6 +892,9 @@ export default function SharePage() {
         )}
         {format === "anim-terminal" && (
           <AnimatedTerminalCard canvasRef={animCanvasRef} animKey={animKey} config={config} {...sharedProps} />
+        )}
+        {format === "anim-route" && (
+          <AnimatedRouteCard canvasRef={animCanvasRef} animKey={animKey} config={config} {...sharedProps} />
         )}
       </div>
 

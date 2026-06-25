@@ -11,6 +11,9 @@ import {
   lapDistanceLabel,
 } from "@/lib/utils";
 import { format } from "date-fns";
+import { CardConfig, DEFAULT_CONFIG } from "@/lib/cardConfig";
+import { RouteMapSvg } from "@/components/cards/RouteMapSvg";
+import type { RoutePoint } from "@/lib/routeUtils";
 
 interface Lap {
   lapIndex: number;
@@ -37,6 +40,8 @@ interface RunReceiptProps {
   steps?: number | null;
   laps?: Lap[];
   orderNumber?: string;
+  config?: CardConfig;
+  routePoints?: RoutePoint[] | null;
 }
 
 const MONO: React.CSSProperties = { fontFamily: "Roboto Mono, Courier New, monospace" };
@@ -56,6 +61,8 @@ export function RunReceipt({
   steps,
   laps = [],
   orderNumber = "0001",
+  config = DEFAULT_CONFIG,
+  routePoints,
 }: RunReceiptProps) {
   const category = getActivityCategory(type);
   const t = type.toLowerCase();
@@ -95,28 +102,39 @@ export function RunReceipt({
   const maxHRVal = hrValues.length ? Math.max(...hrValues) : maxHeartRate;
   const maxBarH = Math.max(...hrValues, 1);
 
-  // Build summary rows
+  // Build summary rows — respecting config.show toggles
   const summaryRows: { label: string; value: string }[] = [];
-  if (isEndurance && distance) {
+  if (config.show.distance && isEndurance && distance) {
     summaryRows.push({ label: "TOTAL", value: isSwim ? `${Math.round(distance)} M` : `${formatDistance(distance)} KM` });
   }
-  summaryRows.push({ label: "DURATION", value: formatDuration(duration) });
-  if (avgPace && isEndurance) {
+  if (config.show.time) {
+    summaryRows.push({ label: "DURATION", value: formatDuration(duration) });
+  }
+  if (config.show.pace && avgPace && isEndurance) {
     summaryRows.push({
       label: isSwim ? "AVG PACE/100M" : isCycle ? "AVG SPEED" : "AVG PACE",
       value: isSwim ? `${formatPace100m(avgPace)}/100M` : isCycle ? `${formatSpeed(1 / avgPace)} KM/H` : `${formatPace(avgPace)}/KM`,
     });
   }
-  if (best1kPace && isRun) summaryRows.push({ label: "BEST 1K", value: best1kPace });
-  if (steps) summaryRows.push({ label: "EST. STEPS", value: steps.toLocaleString() });
-  if (calories) summaryRows.push({ label: "CALORIES", value: `${calories.toLocaleString()} KCAL` });
-  if (elevGain) summaryRows.push({ label: "ELEVATION", value: `+${Math.round(elevGain)}M` });
-  if (!isEndurance) {
+  if (config.show.pace && best1kPace && isRun) {
+    summaryRows.push({ label: "BEST 1K", value: best1kPace });
+  }
+  if (config.show.steps && steps) {
+    summaryRows.push({ label: "EST. STEPS", value: steps.toLocaleString() });
+  }
+  if (config.show.calories && calories) {
+    summaryRows.push({ label: "CALORIES", value: `${calories.toLocaleString()} KCAL` });
+  }
+  if (config.show.elevation && elevGain) {
+    summaryRows.push({ label: "ELEVATION", value: `+${Math.round(elevGain)}M` });
+  }
+  if (!isEndurance && config.show.heartRate) {
     if (avgHeartRate) summaryRows.push({ label: "AVG HR", value: `${avgHeartRate} BPM` });
     if (maxHeartRate) summaryRows.push({ label: "MAX HR", value: `${maxHeartRate} BPM` });
   }
 
   const paceColLabel = isSwim ? "PACE/100" : isCycle ? "SPEED" : "PACE";
+  const showLaps = config.show.laps && laps.length > 0;
 
   return (
     <div style={{ padding: "0 4px" }}>
@@ -148,8 +166,23 @@ export function RunReceipt({
 
             <DashLine />
 
+            {/* Route map — below header, above splits */}
+            {config.show.route && routePoints && routePoints.length > 1 && (
+              <div style={{ margin: "12px 0" }}>
+                <RouteMapSvg
+                  routePoints={routePoints}
+                  viewW={320} viewH={160} padding={14}
+                  strokeColor="#1a1a1a"
+                  strokeWidth={2}
+                  glowOpacity={0}
+                  showDots={true}
+                />
+                <DashLine style={{ marginTop: 12 }} />
+              </div>
+            )}
+
             {/* Splits */}
-            {laps.length > 0 && (
+            {showLaps && (
               <>
                 <div style={{ display: "grid", gridTemplateColumns: "3fr 2.5fr 1fr 2.5fr 2fr", marginTop: 8, marginBottom: 4, ...MONO }}>
                   {["ITEM", paceColLabel, "ZONE", "TIME", "HR"].map((h, i) => (
@@ -181,7 +214,7 @@ export function RunReceipt({
                 })}
 
                 {/* HR summary */}
-                {avgHeartRate && (
+                {config.show.heartRate && avgHeartRate && (
                   <>
                     <DashLine />
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8, ...MONO }}>
@@ -203,28 +236,21 @@ export function RunReceipt({
             )}
 
             {/* Summary */}
-            <div style={{ marginTop: 8 }}>
-              {summaryRows.map(({ label, value }) => (
-                <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, ...MONO }}>
-                  <span style={{ color: "#888", fontSize: 9 }}>{label}</span>
-                  <span style={{ color: "#111", fontWeight: 700, fontSize: 9 }}>{value}</span>
-                </div>
-              ))}
-            </div>
+            {summaryRows.length > 0 && (
+              <div style={{ marginTop: 8 }}>
+                {summaryRows.map(({ label, value }) => (
+                  <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, ...MONO }}>
+                    <span style={{ color: "#888", fontSize: 9 }}>{label}</span>
+                    <span style={{ color: "#111", fontWeight: 700, fontSize: 9 }}>{value}</span>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Footer */}
             <DashLine style={{ marginTop: 4 }} />
             <p style={{ ...MONO, fontWeight: 700, fontSize: 9, color: "#888", textAlign: "center", marginTop: 12 }}>*** DUPLICATE COPY ***</p>
             <p style={{ ...MONO, fontSize: 8, color: "#aaa", textAlign: "center", marginTop: 4 }}>KEEP FOR YOUR RECORDS</p>
-            {/* Branding — commented out for now
-            <p style={{ ...MONO, fontSize: 7, color: "#bbb", textAlign: "center", marginTop: 8, lineHeight: 1.6 }}>
-              Every run leaves a trace. TryAthlete turns it into<br />
-              something you can keep and share.
-            </p>
-            <p style={{ ...MONO, fontWeight: 700, fontSize: 9, color: "#555", textAlign: "center", marginTop: 12 }}>
-              🏃 TryAthlete · tryathlete.app
-            </p>
-            */}
           </div>
 
           {/* Jagged bottom */}

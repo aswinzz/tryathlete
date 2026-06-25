@@ -1,5 +1,6 @@
 import { GarminConnect } from "garmin-connect";
 import { prisma } from "./prisma";
+import { downsample } from "./routeUtils";
 
 export async function getGarminClient(userId: string) {
   const conn = await prisma.trackerConnection.findUnique({
@@ -118,6 +119,23 @@ export async function syncGarminActivities(userId: string) {
       }
     } catch {
       // Lap/split data not always available — skip silently
+    }
+
+    // Fetch GPS route polyline
+    try {
+      const detailsUrl = `https://connectapi.garmin.com/activity-service/activity/${act.activityId}/details`;
+      const details = await client.get<{ geoPolylineDTO?: { polyline?: { lat: number; lon: number }[] } }>(detailsUrl);
+      const polyline = details?.geoPolylineDTO?.polyline;
+      if (Array.isArray(polyline) && polyline.length > 1) {
+        const pts = polyline.map((p) => ({ lat: p.lat, lon: p.lon }));
+        const downsampled = downsample(pts, 200);
+        await prisma.activity.update({
+          where: { id: saved.id },
+          data: { routePoints: JSON.stringify(downsampled) },
+        });
+      }
+    } catch {
+      // GPS not always available (e.g. indoor activities) — skip silently
     }
   }
 

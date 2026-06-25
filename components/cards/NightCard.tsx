@@ -10,6 +10,8 @@ import {
 } from "@/lib/utils";
 import { format } from "date-fns";
 import { CardConfig, DEFAULT_CONFIG, resolveHero, resolveStats } from "@/lib/cardConfig";
+import { RouteMapSvg } from "@/components/cards/RouteMapSvg";
+import type { RoutePoint } from "@/lib/routeUtils";
 
 interface Lap {
   lapIndex: number;
@@ -36,6 +38,7 @@ interface NightCardProps {
   steps?: number | null;
   laps?: Lap[];
   config?: CardConfig;
+  routePoints?: RoutePoint[] | null;
 }
 
 const BG = "#080c18";
@@ -45,11 +48,13 @@ const BORDER = "rgba(129,140,248,0.15)";
 const TEXT = "#f1f5f9";
 const TEXT2 = "rgba(241,245,249,0.45)";
 const TEXT3 = "rgba(241,245,249,0.2)";
+const MAP_BG = "#0c1024";
+const MAP_STROKE = "#818cf8";
 
 export function NightCard({
   cardRef, name, type, startTime, duration, distance,
   avgHeartRate, maxHeartRate, avgPace, calories, elevGain, steps,
-  laps = [], config = DEFAULT_CONFIG,
+  laps = [], config = DEFAULT_CONFIG, routePoints,
 }: NightCardProps) {
   const t = type.toLowerCase();
   const isSwim = t.includes("swim");
@@ -88,6 +93,20 @@ export function NightCard({
         <span style={{ fontFamily: "system-ui, sans-serif", fontSize: 64, fontWeight: 900, color: TEXT, lineHeight: 1 }}>{heroValue}</span>
         {heroUnit && <span style={{ fontFamily: "system-ui, sans-serif", fontSize: 24, fontWeight: 700, color: ACCENT, marginBottom: 4 }}>{heroUnit}</span>}
       </div>
+
+      {/* Route map */}
+      {config.show.route && routePoints && routePoints.length > 1 && (
+        <div style={{ marginBottom: 14, borderRadius: 10, overflow: "hidden", background: MAP_BG }}>
+          <RouteMapSvg
+            routePoints={routePoints}
+            viewW={400} viewH={200} padding={20}
+            strokeColor={MAP_STROKE}
+            strokeWidth={2.5}
+            glowOpacity={0.14}
+            glowWidth={10}
+          />
+        </div>
+      )}
 
       {quickStats.length > 0 && (
         <div style={{ display: "grid", gridTemplateColumns: `repeat(${quickStats.length}, 1fr)`, gap: 12, paddingTop: 16, paddingBottom: 16, borderTop: `1px solid ${BORDER}`, marginBottom: showLaps ? 0 : 4 }}>

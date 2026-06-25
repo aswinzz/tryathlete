@@ -2,6 +2,8 @@
 import { getActivityTypeLabel } from "@/lib/utils";
 import { format } from "date-fns";
 import { CardConfig, DEFAULT_CONFIG, resolveHero, resolveStats } from "@/lib/cardConfig";
+import { RouteMapSvg } from "@/components/cards/RouteMapSvg";
+import type { RoutePoint } from "@/lib/routeUtils";
 
 interface Lap {
   lapIndex: number;
@@ -28,6 +30,7 @@ interface TransparentCardProps {
   steps?: number | null;
   laps?: Lap[];
   config?: CardConfig;
+  routePoints?: RoutePoint[] | null;
 }
 
 const SHADOW_SM = "0 1px 8px rgba(0,0,0,0.55)";
@@ -37,7 +40,7 @@ const ACCENT = "#c8ff00";
 export function TransparentCard({
   cardRef, name, type, startTime, duration, distance,
   avgHeartRate, maxHeartRate, avgPace, calories, elevGain, steps,
-  config = DEFAULT_CONFIG,
+  config = DEFAULT_CONFIG, routePoints,
 }: TransparentCardProps) {
   const typeLabel = getActivityTypeLabel(type).toUpperCase();
   const titleLabel = config.titleMode === "name" && name ? name.toUpperCase() : typeLabel;
@@ -71,6 +74,21 @@ export function TransparentCard({
             ))}
           </div>
         </>
+      )}
+
+      {/* Route mini-map — transparent, only the line is visible */}
+      {config.show.route && routePoints && routePoints.length > 1 && (
+        <div style={{ marginTop: 10 }}>
+          <RouteMapSvg
+            routePoints={routePoints}
+            viewW={360} viewH={160} padding={16}
+            strokeColor="#fff"
+            strokeWidth={2.5}
+            glowOpacity={0.35}
+            glowWidth={10}
+            style={{ filter: "drop-shadow(0 0 4px rgba(0,0,0,0.7))" }}
+          />
+        </div>
       )}
     </div>
   );

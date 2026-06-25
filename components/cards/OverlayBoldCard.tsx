@@ -2,6 +2,8 @@
 import { getActivityTypeLabel } from "@/lib/utils";
 import { format } from "date-fns";
 import { CardConfig, DEFAULT_CONFIG, resolveHero } from "@/lib/cardConfig";
+import { RouteMapSvg } from "@/components/cards/RouteMapSvg";
+import type { RoutePoint } from "@/lib/routeUtils";
 
 interface OverlayBoldCardProps {
   cardRef?: React.RefObject<HTMLDivElement | null>;
@@ -19,6 +21,7 @@ interface OverlayBoldCardProps {
   steps?: number | null;
   laps?: { lapIndex: number; distance: number; duration: number; avgHeartRate?: number | null; avgPace?: number | null; zone?: number | null }[];
   config?: CardConfig;
+  routePoints?: RoutePoint[] | null;
 }
 
 const SHADOW_LG = "0 4px 24px rgba(0,0,0,0.75), 0 1px 6px rgba(0,0,0,0.5)";
@@ -28,7 +31,7 @@ const ACCENT = "#c8ff00";
 export function OverlayBoldCard({
   cardRef, name, type, startTime, duration, distance,
   avgHeartRate, maxHeartRate, avgPace, calories, elevGain, steps,
-  config = DEFAULT_CONFIG,
+  config = DEFAULT_CONFIG, routePoints,
 }: OverlayBoldCardProps) {
   const typeLabel = getActivityTypeLabel(type);
   const titleLabel = config.titleMode === "name" && name ? name : typeLabel;
@@ -46,6 +49,21 @@ export function OverlayBoldCard({
       <div style={{ width: 48, height: 2, background: "rgba(255,255,255,0.35)", borderRadius: 2, margin: "16px auto" }} />
       <p style={{ fontFamily: "system-ui, sans-serif", fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.8)", letterSpacing: "0.12em", textTransform: "uppercase", textShadow: SHADOW_SM }}>{titleLabel}</p>
       <p style={{ fontFamily: "system-ui, sans-serif", fontSize: 11, color: "rgba(255,255,255,0.5)", letterSpacing: "0.06em", marginTop: 4, textShadow: SHADOW_SM }}>{dateStr}</p>
+
+      {/* Route mini-map — transparent, only the line is visible */}
+      {config.show.route && routePoints && routePoints.length > 1 && (
+        <div style={{ marginTop: 16, width: "100%", maxWidth: 280 }}>
+          <RouteMapSvg
+            routePoints={routePoints}
+            viewW={280} viewH={140} padding={14}
+            strokeColor={ACCENT}
+            strokeWidth={2.5}
+            glowOpacity={0.4}
+            glowWidth={10}
+            style={{ filter: "drop-shadow(0 0 5px rgba(0,0,0,0.8))" }}
+          />
+        </div>
+      )}
     </div>
   );
 }

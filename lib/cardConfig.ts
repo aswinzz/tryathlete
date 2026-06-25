@@ -22,6 +22,7 @@ export interface CardConfig {
     elevation: boolean;
     laps: boolean;
     steps: boolean;
+    route: boolean;
   };
 }
 
@@ -37,6 +38,7 @@ export const DEFAULT_CONFIG: CardConfig = {
     elevation: false,
     laps: true,
     steps: false,
+    route: true,
   },
 };
 
@@ -151,8 +153,15 @@ export function availableHeroOptions(data: ActivityData): HeroStat[] {
   return opts;
 }
 
-/** Determine which show toggles make sense for an activity */
-export function availableShowToggles(data: ActivityData): (keyof CardConfig["show"])[] {
+/** Determine which show toggles make sense for an activity + format.
+ *  Pass `formatSupportsLaps` = true only for formats that render a splits table.
+ *  Pass `formatSupportsRoute` = true only for formats that render a route map.
+ *  Pass `hasRoute` = true when the activity has GPS data stored.
+ */
+export function availableShowToggles(
+  data: ActivityData,
+  opts: { formatSupportsLaps?: boolean; formatSupportsRoute?: boolean; hasRoute?: boolean } = {}
+): (keyof CardConfig["show"])[] {
   const isEndurance = getActivityCategory(data.type) === "endurance";
   const toggles: (keyof CardConfig["show"])[] = [];
   if (isEndurance && data.distance) toggles.push("distance");
@@ -161,8 +170,9 @@ export function availableShowToggles(data: ActivityData): (keyof CardConfig["sho
   if (data.avgHeartRate) toggles.push("heartRate");
   if (data.calories) toggles.push("calories");
   if (data.elevGain) toggles.push("elevation");
-  if (isEndurance) toggles.push("laps");
+  if (isEndurance && opts.formatSupportsLaps !== false) toggles.push("laps");
   if (data.steps) toggles.push("steps");
+  if (opts.hasRoute && opts.formatSupportsRoute) toggles.push("route");
   return toggles;
 }
 
@@ -175,6 +185,7 @@ export const TOGGLE_LABELS: Record<keyof CardConfig["show"], string> = {
   elevation: "Elevation",
   laps: "Laps",
   steps: "Steps",
+  route: "Route Map",
 };
 
 export const HERO_LABELS: Record<HeroStat, string> = {

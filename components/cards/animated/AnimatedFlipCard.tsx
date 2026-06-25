@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 import { CardConfig, DEFAULT_CONFIG, resolveHero, resolveStats } from "@/lib/cardConfig";
 import { getActivityTypeLabel } from "@/lib/utils";
 import { format as fmtDate } from "date-fns";
+import { type RoutePoint, projectRouteToCanvas } from "@/lib/routeUtils";
 
 export interface AnimatedFlipCardProps {
   canvasRef?: React.RefObject<HTMLCanvasElement | null>;
@@ -26,6 +27,7 @@ export interface AnimatedFlipCardProps {
   }[];
   config?: CardConfig;
   animKey?: number;
+  routePoints?: RoutePoint[] | null;
 }
 
 const LW = 360, LH = 640, PR = 2; // 9:16
@@ -231,6 +233,7 @@ export function AnimatedFlipCard({
   avgHeartRate, maxHeartRate, avgPace, calories, elevGain, steps,
   config = DEFAULT_CONFIG,
   animKey = 0,
+  routePoints,
 }: AnimatedFlipCardProps) {
   const localRef = useRef<HTMLCanvasElement>(null);
   const ref = (canvasRef ?? localRef) as React.RefObject<HTMLCanvasElement>;
@@ -304,6 +307,22 @@ export function AnimatedFlipCard({
       // Background
       ctx.fillStyle = "#0a0a0a";
       ctx.fillRect(0, 0, CW, CH);
+
+      // Faint background route
+      if (config.show.route && routePoints && routePoints.length > 1) {
+        const proj = projectRouteToCanvas(routePoints, CW, CH, 48);
+        ctx.save();
+        ctx.globalAlpha = 0.07;
+        ctx.strokeStyle = "#c8ff00";
+        ctx.lineWidth = 5;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.beginPath();
+        ctx.moveTo(proj[0].x, proj[0].y);
+        for (let i = 1; i < proj.length; i++) ctx.lineTo(proj[i].x, proj[i].y);
+        ctx.stroke();
+        ctx.restore();
+      }
 
       // Top lime bar
       const barP = easeOut(lerp01(el, 0, 600));
@@ -463,7 +482,7 @@ export function AnimatedFlipCard({
     animKey,
     name, type, startTime, duration, distance,
     avgPace, avgHeartRate, maxHeartRate, calories, elevGain, steps,
-    config,
+    config, routePoints,
   ]);
 
   return (

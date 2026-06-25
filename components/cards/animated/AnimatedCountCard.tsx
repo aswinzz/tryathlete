@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 import { CardConfig, DEFAULT_CONFIG, resolveStats } from "@/lib/cardConfig";
 import { getActivityTypeLabel } from "@/lib/utils";
 import { format as fmtDate } from "date-fns";
+import { type RoutePoint, projectRouteToCanvas } from "@/lib/routeUtils";
 
 export interface AnimatedCountCardProps {
   canvasRef?: React.RefObject<HTMLCanvasElement | null>;
@@ -20,6 +21,7 @@ export interface AnimatedCountCardProps {
   laps?: { lapIndex: number; distance: number; duration: number; avgHeartRate?: number | null; avgPace?: number | null }[];
   config?: CardConfig;
   animKey?: number;
+  routePoints?: RoutePoint[] | null;
 }
 
 // Logical px → canvas px at 2× for crisp export  (9:16 = 360×640)
@@ -56,6 +58,7 @@ export function AnimatedCountCard({
   avgHeartRate, maxHeartRate, avgPace, calories, elevGain, steps,
   config = DEFAULT_CONFIG,
   animKey = 0,
+  routePoints,
 }: AnimatedCountCardProps) {
   const localRef = useRef<HTMLCanvasElement>(null);
   const ref = (canvasRef ?? localRef) as React.RefObject<HTMLCanvasElement>;
@@ -116,6 +119,22 @@ export function AnimatedCountCard({
       // Background
       ctx.fillStyle = "#0a0a0a";
       ctx.fillRect(0, 0, CW, CH);
+
+      // ── Faint background route ────────────────────────────────────
+      if (config.show.route && routePoints && routePoints.length > 1) {
+        const proj = projectRouteToCanvas(routePoints, CW, CH, 48);
+        ctx.save();
+        ctx.globalAlpha = 0.07;
+        ctx.strokeStyle = "#c8ff00";
+        ctx.lineWidth = 5;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.beginPath();
+        ctx.moveTo(proj[0].x, proj[0].y);
+        for (let i = 1; i < proj.length; i++) ctx.lineTo(proj[i].x, proj[i].y);
+        ctx.stroke();
+        ctx.restore();
+      }
 
       // ── Lime top bar grows left → right ───────────────────────────
       const barP = easeOut(lerp01(el, BAR_START, BAR_DUR));
@@ -221,7 +240,7 @@ export function AnimatedCountCard({
 
     raf = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(raf);
-  }, [animKey, name, type, startTime, duration, distance, avgPace, avgHeartRate, maxHeartRate, calories, elevGain, steps, config]);
+  }, [animKey, name, type, startTime, duration, distance, avgPace, avgHeartRate, maxHeartRate, calories, elevGain, steps, config, routePoints]);
 
   return (
     <canvas

@@ -2,6 +2,8 @@
 import { getActivityTypeLabel } from "@/lib/utils";
 import { format } from "date-fns";
 import { CardConfig, DEFAULT_CONFIG, resolveHero, resolveStats } from "@/lib/cardConfig";
+import { RouteMapSvg } from "@/components/cards/RouteMapSvg";
+import type { RoutePoint } from "@/lib/routeUtils";
 
 interface OverlayBarCardProps {
   cardRef?: React.RefObject<HTMLDivElement | null>;
@@ -19,6 +21,7 @@ interface OverlayBarCardProps {
   steps?: number | null;
   laps?: { lapIndex: number; distance: number; duration: number; avgHeartRate?: number | null; avgPace?: number | null; zone?: number | null }[];
   config?: CardConfig;
+  routePoints?: RoutePoint[] | null;
 }
 
 const SHADOW = "0 2px 12px rgba(0,0,0,0.7)";
@@ -28,7 +31,7 @@ const ACCENT = "#c8ff00";
 export function OverlayBarCard({
   cardRef, name, type, startTime, duration, distance,
   avgHeartRate, maxHeartRate, avgPace, calories, elevGain, steps,
-  config = DEFAULT_CONFIG,
+  config = DEFAULT_CONFIG, routePoints,
 }: OverlayBarCardProps) {
   const typeLabel = getActivityTypeLabel(type).toUpperCase();
   const titleLabel = config.titleMode === "name" && name ? name.toUpperCase() : typeLabel;
@@ -47,6 +50,22 @@ export function OverlayBarCard({
         <span style={{ width: 3, height: 3, borderRadius: "50%", background: "rgba(255,255,255,0.3)", display: "inline-block" }} />
         <span style={{ fontFamily: "system-ui, sans-serif", fontSize: 10, color: "rgba(255,255,255,0.6)", letterSpacing: "0.06em" }}>{dateStr}</span>
       </div>
+
+      {/* Route mini-map — top-right, floating above the photo */}
+      {/* Route mini-map — transparent, floats top-right */}
+      {config.show.route && routePoints && routePoints.length > 1 && (
+        <div style={{ position: "absolute", top: 16, right: 16, width: 140 }}>
+          <RouteMapSvg
+            routePoints={routePoints}
+            viewW={140} viewH={100} padding={10}
+            strokeColor={ACCENT}
+            strokeWidth={2}
+            glowOpacity={0.4}
+            glowWidth={8}
+            style={{ filter: "drop-shadow(0 0 4px rgba(0,0,0,0.8))" }}
+          />
+        </div>
+      )}
 
       {/* Bottom bar */}
       <div style={{ background: "rgba(0,0,0,0.72)", padding: "16px 18px 20px", display: "flex", alignItems: "center", gap: 0 }}>

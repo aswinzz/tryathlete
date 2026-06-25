@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 import { CardConfig, DEFAULT_CONFIG, resolveHero, resolveStats } from "@/lib/cardConfig";
 import { getActivityTypeLabel } from "@/lib/utils";
 import { format as fmtDate } from "date-fns";
+import { type RoutePoint, projectRouteToCanvas } from "@/lib/routeUtils";
 
 export interface AnimatedTerminalCardProps {
   canvasRef?: React.RefObject<HTMLCanvasElement | null>;
@@ -26,6 +27,7 @@ export interface AnimatedTerminalCardProps {
   }[];
   config?: CardConfig;
   animKey?: number;
+  routePoints?: RoutePoint[] | null;
 }
 
 const LW = 360, LH = 640, PR = 2; // 9:16
@@ -98,6 +100,7 @@ export function AnimatedTerminalCard({
   avgHeartRate, maxHeartRate, avgPace, calories, elevGain, steps,
   config = DEFAULT_CONFIG,
   animKey = 0,
+  routePoints,
 }: AnimatedTerminalCardProps) {
   const localRef = useRef<HTMLCanvasElement>(null);
   const ref = (canvasRef ?? localRef) as React.RefObject<HTMLCanvasElement>;
@@ -193,6 +196,22 @@ export function AnimatedTerminalCard({
       // ── Background ──────────────────────────────────────────────────────
       ctx.fillStyle = BG;
       ctx.fillRect(0, 0, CW, CH);
+
+      // Faint background route
+      if (config.show.route && routePoints && routePoints.length > 1) {
+        const proj = projectRouteToCanvas(routePoints, CW, CH, 48);
+        ctx.save();
+        ctx.globalAlpha = 0.06;
+        ctx.strokeStyle = "#00e040";
+        ctx.lineWidth = 5;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.beginPath();
+        ctx.moveTo(proj[0].x, proj[0].y);
+        for (let i = 1; i < proj.length; i++) ctx.lineTo(proj[i].x, proj[i].y);
+        ctx.stroke();
+        ctx.restore();
+      }
 
       // Subtle scanline texture
       ctx.globalAlpha = 0.028;
@@ -321,7 +340,7 @@ export function AnimatedTerminalCard({
     animKey,
     name, type, startTime, duration, distance,
     avgPace, avgHeartRate, maxHeartRate, calories, elevGain, steps,
-    config,
+    config, routePoints,
   ]);
 
   return (

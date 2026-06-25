@@ -2,6 +2,8 @@
 import { getActivityTypeLabel } from "@/lib/utils";
 import { format } from "date-fns";
 import { CardConfig, DEFAULT_CONFIG, resolveHero, resolveStats } from "@/lib/cardConfig";
+import { RouteMapSvg } from "@/components/cards/RouteMapSvg";
+import type { RoutePoint } from "@/lib/routeUtils";
 
 interface OverlayPillsCardProps {
   cardRef?: React.RefObject<HTMLDivElement | null>;
@@ -19,6 +21,7 @@ interface OverlayPillsCardProps {
   steps?: number | null;
   laps?: { lapIndex: number; distance: number; duration: number; avgHeartRate?: number | null; avgPace?: number | null; zone?: number | null }[];
   config?: CardConfig;
+  routePoints?: RoutePoint[] | null;
 }
 
 const PILL_BG = "rgba(0,0,0,0.65)";
@@ -28,7 +31,7 @@ const ACCENT = "#c8ff00";
 export function OverlayPillsCard({
   cardRef, name, type, startTime, duration, distance,
   avgHeartRate, maxHeartRate, avgPace, calories, elevGain, steps,
-  config = DEFAULT_CONFIG,
+  config = DEFAULT_CONFIG, routePoints,
 }: OverlayPillsCardProps) {
   const typeLabel = getActivityTypeLabel(type).toUpperCase();
   const titleLabel = config.titleMode === "name" && name ? name.toUpperCase() : typeLabel;
@@ -47,6 +50,21 @@ export function OverlayPillsCard({
         <span style={{ width: 3, height: 3, borderRadius: "50%", background: "rgba(255,255,255,0.25)", display: "inline-block" }} />
         <span style={{ fontFamily: "system-ui, sans-serif", fontSize: 11, color: "rgba(255,255,255,0.55)", letterSpacing: "0.06em" }}>{dateStr}</span>
       </div>
+
+      {/* Route mini-map — transparent, only the line is visible */}
+      {config.show.route && routePoints && routePoints.length > 1 && (
+        <div style={{ width: "100%", maxWidth: 280 }}>
+          <RouteMapSvg
+            routePoints={routePoints}
+            viewW={280} viewH={140} padding={14}
+            strokeColor={ACCENT}
+            strokeWidth={2.5}
+            glowOpacity={0.4}
+            glowWidth={10}
+            style={{ filter: "drop-shadow(0 0 5px rgba(0,0,0,0.8))" }}
+          />
+        </div>
+      )}
 
       {/* Hero pill */}
       <div style={{ background: "rgba(200,255,0,0.15)", border: "1px solid rgba(200,255,0,0.35)", borderRadius: 100, padding: "12px 28px", boxShadow: SHADOW }}>

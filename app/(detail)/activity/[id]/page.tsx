@@ -18,6 +18,8 @@ import {
 } from "@/lib/utils";
 import { format } from "date-fns";
 import { SyncLapsButton } from "./SyncLapsButton";
+import { RouteDisplay } from "@/components/activity/RouteDisplay";
+import { RoutePoint } from "@/lib/routeUtils";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +35,8 @@ export default async function ActivityDetailPage({
     where: { id, userId: session!.user!.id! },
     include: { laps: { orderBy: { lapIndex: "asc" } } },
   });
+  // routePoints added in schema — types update after `prisma generate`
+  const routePointsRaw: string | null = (activity as any)?.routePoints ?? null; // eslint-disable-line @typescript-eslint/no-explicit-any
 
   if (!activity) notFound();
 
@@ -105,6 +109,12 @@ export default async function ActivityDetailPage({
 
   const hasLaps = activity.laps.length > 0;
 
+  // Parse stored route points (null if not yet fetched or indoor activity)
+  let parsedRoutePoints: RoutePoint[] | null = null;
+  try {
+    if (routePointsRaw) parsedRoutePoints = JSON.parse(routePointsRaw) as RoutePoint[];
+  } catch { /* ignore */ }
+
   return (
     <div className="flex flex-col min-h-dvh">
       {/* Top bar */}
@@ -150,6 +160,15 @@ export default async function ActivityDetailPage({
           ))}
         </div>
       </div>
+
+      {/* Route map — show for endurance activities with GPS or Garmin ID */}
+      {isEndurance && (
+        <RouteDisplay
+          activityId={activity.id}
+          garminId={activity.garminId ?? null}
+          initialRoutePoints={parsedRoutePoints}
+        />
+      )}
 
       {/* Splits / laps — endurance only */}
       {isEndurance && (

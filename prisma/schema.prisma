@@ -93,6 +93,7 @@ model Activity {
   elevLoss    Float?
   steps       Int?
   rawData     String?  // JSON blob of full Garmin response
+  routePoints String?  // JSON array of {lat, lon} — downsampled GPS polyline
   createdAt   DateTime @default(now())
 
   user User        @relation(fields: [userId], references: [id], onDelete: Cascade)

@@ -2,6 +2,8 @@
 import { formatDuration, getActivityTypeLabel } from "@/lib/utils";
 import { format } from "date-fns";
 import { CardConfig, DEFAULT_CONFIG, resolveHero, resolveStats } from "@/lib/cardConfig";
+import { RouteMapSvg } from "@/components/cards/RouteMapSvg";
+import type { RoutePoint } from "@/lib/routeUtils";
 
 interface Lap {
   lapIndex: number;
@@ -28,17 +30,20 @@ interface MinimalCardProps {
   steps?: number | null;
   laps?: Lap[];
   config?: CardConfig;
+  routePoints?: RoutePoint[] | null;
 }
 
 const BG = "#ffffff";
 const BORDER = "#f0f0f0";
 const TEXT = "#0a0a0a";
 const TEXT2 = "#888888";
+const MAP_BG = "#f0f0f0";
+const MAP_STROKE = "#111111";
 
 export function MinimalCard({
   cardRef, name, type, startTime, duration, distance,
   avgHeartRate, maxHeartRate, avgPace, calories, elevGain, steps,
-  laps = [], config = DEFAULT_CONFIG,
+  laps = [], config = DEFAULT_CONFIG, routePoints,
 }: MinimalCardProps) {
   const typeLabel = getActivityTypeLabel(type);
   const titleLabel = config.titleMode === "name" && name ? name : typeLabel;
@@ -62,6 +67,12 @@ export function MinimalCard({
           {heroUnit && <span style={{ fontFamily: "system-ui, sans-serif", fontSize: 28, fontWeight: 300, color: TEXT2, marginBottom: 6 }}>{heroUnit}</span>}
         </div>
       </div>
+
+      {config.show.route && routePoints && routePoints.length > 1 && (
+        <div style={{ marginBottom: 24, borderRadius: 12, overflow: "hidden", background: MAP_BG }}>
+          <RouteMapSvg routePoints={routePoints} viewW={400} viewH={200} padding={20} strokeColor={MAP_STROKE} strokeWidth={2} glowOpacity={0} strokeStyle="solid" />
+        </div>
+      )}
 
       <div style={{ height: 1, background: BORDER, marginBottom: 24 }} />
 

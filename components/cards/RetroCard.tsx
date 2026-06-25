@@ -10,6 +10,8 @@ import {
 } from "@/lib/utils";
 import { format } from "date-fns";
 import { CardConfig, DEFAULT_CONFIG, resolveHero, resolveStats } from "@/lib/cardConfig";
+import { RouteMapSvg } from "@/components/cards/RouteMapSvg";
+import type { RoutePoint } from "@/lib/routeUtils";
 
 interface Lap {
   lapIndex: number;
@@ -36,6 +38,7 @@ interface RetroCardProps {
   steps?: number | null;
   laps?: Lap[];
   config?: CardConfig;
+  routePoints?: RoutePoint[] | null;
 }
 
 const BG = "#F2EDE4";
@@ -45,11 +48,13 @@ const TEXT3 = "#999";
 const BORDER = "#C8C0B0";
 const MONO: React.CSSProperties = { fontFamily: "'Courier New', Courier, monospace" };
 const SANS: React.CSSProperties = { fontFamily: "system-ui, sans-serif" };
+const MAP_BG = "#E8E3DA";
+const MAP_STROKE = "#1a1a1a";
 
 export function RetroCard({
   cardRef, name, type, startTime, duration, distance,
   avgHeartRate, maxHeartRate, avgPace, calories, elevGain, steps,
-  laps = [], config = DEFAULT_CONFIG,
+  laps = [], config = DEFAULT_CONFIG, routePoints,
 }: RetroCardProps) {
   const t = type.toLowerCase();
   const isSwim = t.includes("swim");
@@ -85,6 +90,12 @@ export function RetroCard({
       </div>
 
       <div style={{ height: 1, background: BORDER, marginBottom: 14 }} />
+
+      {config.show.route && routePoints && routePoints.length > 1 && (
+        <div style={{ marginBottom: 14, borderRadius: 4, overflow: "hidden", background: MAP_BG }}>
+          <RouteMapSvg routePoints={routePoints} viewW={400} viewH={180} padding={18} strokeColor={MAP_STROKE} strokeWidth={1.5} glowOpacity={0} strokeStyle="dashed" showDots={true} />
+        </div>
+      )}
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 20px" }}>
         <div style={{ borderRight: `1px solid ${BORDER}`, paddingRight: 20 }}>

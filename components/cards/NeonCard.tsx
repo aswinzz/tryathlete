@@ -10,6 +10,8 @@ import {
 } from "@/lib/utils";
 import { format } from "date-fns";
 import { CardConfig, DEFAULT_CONFIG, resolveHero, resolveStats } from "@/lib/cardConfig";
+import { RouteMapSvg } from "@/components/cards/RouteMapSvg";
+import type { RoutePoint } from "@/lib/routeUtils";
 
 interface Lap {
   lapIndex: number;
@@ -36,6 +38,7 @@ interface NeonCardProps {
   steps?: number | null;
   laps?: Lap[];
   config?: CardConfig;
+  routePoints?: RoutePoint[] | null;
 }
 
 const BG = "#050505";
@@ -44,11 +47,13 @@ const BORDER = "#1a1a1a";
 const BORDER_ACCENT = "rgba(200,255,0,0.2)";
 const TEXT = "#ffffff";
 const TEXT2 = "rgba(255,255,255,0.4)";
+const MAP_BG = "#0a0f00";
+const MAP_STROKE = "#c8ff00";
 
 export function NeonCard({
   cardRef, name, type, startTime, duration, distance,
   avgHeartRate, maxHeartRate, avgPace, calories, elevGain, steps,
-  laps = [], config = DEFAULT_CONFIG,
+  laps = [], config = DEFAULT_CONFIG, routePoints,
 }: NeonCardProps) {
   const t = type.toLowerCase();
   const isSwim = t.includes("swim");
@@ -79,6 +84,20 @@ export function NeonCard({
         <span style={{ fontFamily: "system-ui, sans-serif", fontSize: 72, fontWeight: 900, color: ACCENT, lineHeight: 1, letterSpacing: "-0.02em" }}>{heroValue}</span>
         {heroUnit && <span style={{ fontFamily: "system-ui, sans-serif", fontSize: 26, fontWeight: 700, color: "rgba(200,255,0,0.5)", marginBottom: 4 }}>{heroUnit}</span>}
       </div>
+
+      {/* Route map */}
+      {config.show.route && routePoints && routePoints.length > 1 && (
+        <div style={{ marginBottom: 14, borderRadius: 10, overflow: "hidden", background: MAP_BG }}>
+          <RouteMapSvg
+            routePoints={routePoints}
+            viewW={400} viewH={200} padding={20}
+            strokeColor={MAP_STROKE}
+            strokeWidth={2.5}
+            glowOpacity={0.22}
+            glowWidth={14}
+          />
+        </div>
+      )}
 
       {quickStats.length > 0 && (
         <div style={{ display: "grid", gridTemplateColumns: `repeat(${quickStats.length}, 1fr)`, gap: 12, paddingTop: 14, paddingBottom: 14, borderTop: `1px solid ${BORDER_ACCENT}`, marginBottom: showLaps ? 0 : 4 }}>

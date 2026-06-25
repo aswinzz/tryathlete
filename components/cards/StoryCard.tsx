@@ -8,6 +8,8 @@ import {
 } from "@/lib/utils";
 import { format } from "date-fns";
 import { CardConfig, DEFAULT_CONFIG, resolveHero, resolveStats } from "@/lib/cardConfig";
+import { RouteMapSvg } from "@/components/cards/RouteMapSvg";
+import type { RoutePoint } from "@/lib/routeUtils";
 
 interface Lap {
   lapIndex: number;
@@ -34,6 +36,7 @@ interface StoryCardProps {
   steps?: number | null;
   laps?: Lap[];
   config?: CardConfig;
+  routePoints?: RoutePoint[] | null;
 }
 
 const BG = "#0a0a0a";
@@ -41,11 +44,13 @@ const ACCENT = "#c8ff00";
 const BORDER = "#1e1e1e";
 const TEXT = "#ffffff";
 const TEXT2 = "rgba(255,255,255,0.45)";
+const MAP_BG = "#111111";
+const MAP_STROKE = "#c8ff00";
 
 export function StoryCard({
   cardRef, name, type, startTime, duration, distance,
   avgHeartRate, maxHeartRate, avgPace, calories, elevGain, steps,
-  laps = [], config = DEFAULT_CONFIG,
+  laps = [], config = DEFAULT_CONFIG, routePoints,
 }: StoryCardProps) {
   const t = type.toLowerCase();
   const isSwim = t.includes("swim");
@@ -80,6 +85,12 @@ export function StoryCard({
           {titleLabel}
         </p>
       </div>
+
+      {config.show.route && routePoints && routePoints.length > 1 && (
+        <div style={{ position: "relative", margin: "0 -28px", background: MAP_BG }}>
+          <RouteMapSvg routePoints={routePoints} viewW={400} viewH={220} padding={22} strokeColor={MAP_STROKE} strokeWidth={2.5} glowOpacity={0.18} glowWidth={12} />
+        </div>
+      )}
 
       <div style={{ position: "relative", textAlign: "center" }}>
         <div style={{ fontFamily: "system-ui, sans-serif", fontSize: 96, fontWeight: 900, color: TEXT, lineHeight: 1, letterSpacing: "-0.02em" }}>
