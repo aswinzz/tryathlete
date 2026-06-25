@@ -12,7 +12,6 @@ export default async function ClaudeSetupPage() {
   const session = await auth();
   const userId = session!.user!.id!;
 
-  // Get or create MCP token
   let user = await prisma.user.findUnique({
     where: { id: userId },
     select: { mcpToken: true, name: true },
