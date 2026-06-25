@@ -60,7 +60,8 @@ interface Activity {
 type Format =
   | "receipt" | "dark" | "neon" | "night" | "story" | "retro" | "minimal" | "route"
   | "overlay-clean" | "overlay-bar" | "overlay-bold" | "overlay-pills"
-  | "receipt-anim" | "anim-count" | "anim-ecg" | "anim-flip" | "anim-terminal" | "anim-route";
+  | "receipt-anim" | "anim-count" | "anim-ecg" | "anim-flip" | "anim-terminal" | "anim-route"
+  | "dark-glass" | "neon-glass" | "night-glass" | "story-glass" | "retro-glass" | "minimal-glass";
 
 interface FormatDef {
   id: Format;
@@ -94,6 +95,13 @@ const FORMATS: FormatDef[] = [
   { id: "overlay-bar",   label: "Bar",      hint: "Overlay · frosted bar at the bottom",    bg: null, swatchBg: undefined, swatchText: "#fff",     group: "Overlay" },
   { id: "overlay-bold",  label: "Bold",     hint: "Overlay · giant number only",            bg: null, swatchBg: undefined, swatchText: "#c8ff00",  group: "Overlay" },
   { id: "overlay-pills", label: "Pills",    hint: "Overlay · floating stat badges",         bg: null, swatchBg: undefined, swatchText: "#fff",     group: "Overlay" },
+  // — Glass (full card themes with transparent background) —
+  { id: "dark-glass",    label: "Dark",     hint: "Dark theme · transparent",  bg: null, swatchBg: "#0a0a0a", swatchText: "rgba(255,255,255,0.6)",  group: "Glass" },
+  { id: "neon-glass",    label: "Neon",     hint: "Neon theme · transparent",  bg: null, swatchBg: "#050505", swatchText: "#c8ff00",               group: "Glass" },
+  { id: "night-glass",   label: "Night",    hint: "Night theme · transparent", bg: null, swatchBg: "#080c18", swatchText: "#818cf8",               group: "Glass" },
+  { id: "story-glass",   label: "Story",    hint: "Story theme · transparent", bg: null, swatchBg: "#0a0a0a", swatchText: "#c8ff00",               group: "Glass" },
+  { id: "retro-glass",   label: "Retro",    hint: "Retro theme · transparent", bg: null, swatchBg: "#F2EDE4", swatchText: "#1a1a1a",               group: "Glass" },
+  { id: "minimal-glass", label: "Minimal",  hint: "Minimal theme · transparent", bg: null, swatchBg: "#ffffff", swatchText: "#0a0a0a",             group: "Glass" },
 ];
 
 export default function SharePage() {
@@ -627,12 +635,12 @@ export default function SharePage() {
 
       {/* Format picker */}
       <div className="px-5 mb-4">
-        {(["Cards", "Animated", "Overlay"] as const).map((group) => {
+        {(["Cards", "Animated", "Overlay", "Glass"] as const).map((group) => {
           const groupFormats = FORMATS.filter((f) => f.group === group);
           return (
             <div key={group} className="mb-3">
               <p className="text-[9px] font-bold text-[var(--text-3)] uppercase tracking-widest mb-2">
-                {group === "Overlay" ? "Overlay (transparent PNG)" : group === "Animated" ? "Animated (saves as video)" : group}
+                {group === "Overlay" ? "Overlay (transparent PNG)" : group === "Animated" ? "Animated (saves as video)" : group === "Glass" ? "Glass (transparent PNG)" : group}
               </p>
               <div className="flex gap-3 overflow-x-auto pb-1">
                 {groupFormats.map((f) => {
@@ -695,9 +703,9 @@ export default function SharePage() {
         };
         const heroOptions = availableHeroOptions(activityData);
         // Laps (splits table) only applies to static dark/neon/night/minimal/retro cards
-        const LAPS_FORMATS: Format[] = ["receipt", "receipt-anim", "dark", "neon", "night", "minimal", "retro"];
+        const LAPS_FORMATS: Format[] = ["receipt", "receipt-anim", "dark", "neon", "night", "minimal", "retro", "dark-glass", "neon-glass", "night-glass", "retro-glass", "minimal-glass"];
         // Route map applies to all formats except pure canvas animations without overlay
-        const ROUTE_FORMATS: Format[] = ["receipt", "receipt-anim", "dark", "neon", "night", "minimal", "retro", "story", "route", "overlay-clean", "overlay-bar", "overlay-bold", "overlay-pills", "anim-count", "anim-ecg", "anim-flip", "anim-terminal", "anim-route"];
+        const ROUTE_FORMATS: Format[] = ["receipt", "receipt-anim", "dark", "neon", "night", "minimal", "retro", "story", "route", "overlay-clean", "overlay-bar", "overlay-bold", "overlay-pills", "dark-glass", "neon-glass", "night-glass", "story-glass", "retro-glass", "minimal-glass", "anim-count", "anim-ecg", "anim-flip", "anim-terminal", "anim-route"];
         const showToggles = availableShowToggles(activityData, {
           formatSupportsLaps: LAPS_FORMATS.includes(format),
           formatSupportsRoute: ROUTE_FORMATS.includes(format),
@@ -804,8 +812,9 @@ export default function SharePage() {
             {format === "minimal" && <MinimalCard cardRef={cardRef} config={config} {...sharedProps} />}
             {format === "route"   && <RouteCard   cardRef={cardRef} config={config} {...sharedProps} />}
 
-            {/* Overlay variants — checkerboard is preview-only (excluded from PNG export) */}
-            {(format === "overlay-clean" || format === "overlay-bar" || format === "overlay-bold" || format === "overlay-pills") && (
+            {/* Overlay + Glass variants — checkerboard is preview-only (excluded from PNG export) */}
+            {(format === "overlay-clean" || format === "overlay-bar" || format === "overlay-bold" || format === "overlay-pills" ||
+              format === "dark-glass" || format === "neon-glass" || format === "night-glass" || format === "story-glass" || format === "retro-glass" || format === "minimal-glass") && (
               <>
                 <div
                   className="preview-only"
@@ -822,6 +831,12 @@ export default function SharePage() {
                   {format === "overlay-bar"    && <OverlayBarCard  cardRef={cardRef} config={config} {...sharedProps} />}
                   {format === "overlay-bold"   && <OverlayBoldCard cardRef={cardRef} config={config} {...sharedProps} />}
                   {format === "overlay-pills"  && <OverlayPillsCard cardRef={cardRef} config={config} {...sharedProps} />}
+                  {format === "dark-glass"     && <DarkCard    glass cardRef={cardRef} config={config} {...sharedProps} />}
+                  {format === "neon-glass"     && <NeonCard    glass cardRef={cardRef} config={config} {...sharedProps} />}
+                  {format === "night-glass"    && <NightCard   glass cardRef={cardRef} config={config} {...sharedProps} />}
+                  {format === "story-glass"    && <StoryCard   glass cardRef={cardRef} config={config} {...sharedProps} />}
+                  {format === "retro-glass"    && <RetroCard   glass cardRef={cardRef} config={config} {...sharedProps} />}
+                  {format === "minimal-glass"  && <MinimalCard glass cardRef={cardRef} config={config} {...sharedProps} />}
                 </div>
               </>
             )}

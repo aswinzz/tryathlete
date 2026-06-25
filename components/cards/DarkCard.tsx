@@ -39,11 +39,11 @@ interface DarkCardProps {
   laps?: Lap[];
   config?: CardConfig;
   routePoints?: RoutePoint[] | null;
+  glass?: boolean;
 }
 
 const BG = "#0a0a0a";
 const ACCENT = "#c8ff00";
-const BORDER = "#1e1e1e";
 const TEXT = "#ffffff";
 const TEXT2 = "rgba(255,255,255,0.45)";
 const TEXT3 = "rgba(255,255,255,0.25)";
@@ -53,7 +53,7 @@ const MAP_STROKE = "#c8ff00";
 export function DarkCard({
   cardRef, name, type, startTime, duration, distance,
   avgHeartRate, maxHeartRate, avgPace, calories, elevGain, steps,
-  laps = [], config = DEFAULT_CONFIG, routePoints,
+  laps = [], config = DEFAULT_CONFIG, routePoints, glass = false,
 }: DarkCardProps) {
   const t = type.toLowerCase();
   const isSwim = t.includes("swim");
@@ -69,41 +69,43 @@ export function DarkCard({
   const quickStats = resolveStats(config, data, 3);
   const showLaps = config.show.laps && laps.length > 0;
 
+  // In glass mode, borders become subtle white lines
+  const bdr = glass ? "rgba(255,255,255,0.13)" : "#1e1e1e";
+
   const fastestLap = laps.reduce(
     (best: Lap | null, l) => !best || (l.avgPace && (!best.avgPace || l.avgPace < best.avgPace)) ? l : best, null
   );
   const paceColLabel = isSwim ? "PACE/100M" : isCycle ? "SPEED" : "PACE";
 
   return (
-    <div ref={cardRef} style={{ background: BG, borderRadius: 20, overflow: "hidden", padding: "24px 22px 28px", width: "100%", boxSizing: "border-box" }}>
+    <div ref={cardRef} style={{ background: glass ? "transparent" : BG, borderRadius: 20, overflow: "hidden", padding: "24px 22px 28px", width: "100%", boxSizing: "border-box" }}>
       <div style={{ width: 48, height: 3, background: ACCENT, borderRadius: 2, marginBottom: 16 }} />
       <p style={{ fontFamily: "system-ui, sans-serif", fontSize: 10, fontWeight: 700, color: ACCENT, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 10 }}>
         {titleLabel} · {dateStr} · {timeStr}
       </p>
       <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 20 }}>
-        <span style={{ fontFamily: "system-ui, sans-serif", fontSize: 64, fontWeight: 900, color: TEXT, lineHeight: 1 }}>{heroValue}</span>
+        <span style={{ fontFamily: "system-ui, sans-serif", fontSize: 64, fontWeight: 900, color: TEXT, lineHeight: 1, textShadow: glass ? "0 2px 8px rgba(0,0,0,0.7)" : undefined }}>{heroValue}</span>
         {heroUnit && <span style={{ fontFamily: "system-ui, sans-serif", fontSize: 24, fontWeight: 700, color: TEXT2, marginBottom: 4 }}>{heroUnit}</span>}
       </div>
 
       {/* Route map */}
       {config.show.route && routePoints && routePoints.length > 1 && (
-        <div style={{ marginBottom: 14, borderRadius: 10, overflow: "hidden", background: MAP_BG }}>
-          <RouteMapSvg
-            routePoints={routePoints}
-            viewW={400} viewH={200} padding={20}
-            strokeColor={MAP_STROKE}
-            strokeWidth={2.5}
-            glowOpacity={0.14}
-            glowWidth={10}
-          />
-        </div>
+        glass ? (
+          <div style={{ marginBottom: 14 }}>
+            <RouteMapSvg routePoints={routePoints} viewW={400} viewH={200} padding={20} strokeColor={MAP_STROKE} strokeWidth={2.5} glowOpacity={0.4} glowWidth={12} style={{ filter: "drop-shadow(0 0 5px rgba(0,0,0,0.8))" }} />
+          </div>
+        ) : (
+          <div style={{ marginBottom: 14, borderRadius: 10, overflow: "hidden", background: MAP_BG }}>
+            <RouteMapSvg routePoints={routePoints} viewW={400} viewH={200} padding={20} strokeColor={MAP_STROKE} strokeWidth={2.5} glowOpacity={0.14} glowWidth={10} />
+          </div>
+        )
       )}
 
       {quickStats.length > 0 && (
-        <div style={{ display: "grid", gridTemplateColumns: `repeat(${quickStats.length}, 1fr)`, gap: 12, paddingTop: 16, paddingBottom: 16, borderTop: `1px solid ${BORDER}`, marginBottom: showLaps ? 0 : 4 }}>
+        <div style={{ display: "grid", gridTemplateColumns: `repeat(${quickStats.length}, 1fr)`, gap: 12, paddingTop: 16, paddingBottom: 16, borderTop: `1px solid ${bdr}`, marginBottom: showLaps ? 0 : 4 }}>
           {quickStats.map(({ label, value }, i) => (
-            <div key={label} style={i > 0 ? { borderLeft: `1px solid ${BORDER}`, paddingLeft: 12 } : {}}>
-              <p style={{ fontFamily: "system-ui, sans-serif", fontSize: 17, fontWeight: 800, color: TEXT, lineHeight: 1 }}>{value}</p>
+            <div key={label} style={i > 0 ? { borderLeft: `1px solid ${bdr}`, paddingLeft: 12 } : {}}>
+              <p style={{ fontFamily: "system-ui, sans-serif", fontSize: 17, fontWeight: 800, color: TEXT, lineHeight: 1, textShadow: glass ? "0 1px 6px rgba(0,0,0,0.6)" : undefined }}>{value}</p>
               <p style={{ fontFamily: "system-ui, sans-serif", fontSize: 9, fontWeight: 600, color: TEXT2, textTransform: "uppercase", letterSpacing: "0.1em", marginTop: 4 }}>{label}</p>
             </div>
           ))}
@@ -111,7 +113,7 @@ export function DarkCard({
       )}
 
       {showLaps && (
-        <div style={{ borderTop: `1px solid ${BORDER}`, paddingTop: 12, marginTop: 4 }}>
+        <div style={{ borderTop: `1px solid ${bdr}`, paddingTop: 12, marginTop: 4 }}>
           <div style={{ display: "grid", gridTemplateColumns: "3fr 2.5fr 1fr 2.5fr 2fr", marginBottom: 8 }}>
             {["SPLIT", paceColLabel, "Z", "TIME", "HR"].map((h, i) => (
               <span key={h} style={{ fontFamily: "system-ui, sans-serif", fontSize: 9, fontWeight: 600, color: TEXT3, textTransform: "uppercase", letterSpacing: "0.08em", textAlign: i === 0 ? "left" : i === 4 ? "right" : "center" }}>{h}</span>
@@ -123,7 +125,7 @@ export function DarkCard({
             const isFastest = fastestLap?.lapIndex === lap.lapIndex && laps.length > 2;
             const lapPace = lap.avgPace ? (isSwim ? formatPace100m(lap.avgPace) : isCycle ? `${formatSpeed(1 / lap.avgPace)}` : formatPace(lap.avgPace)) : "—";
             return (
-              <div key={lap.lapIndex} style={{ display: "grid", gridTemplateColumns: "3fr 2.5fr 1fr 2.5fr 2fr", alignItems: "center", padding: "9px 0", borderBottom: `1px solid ${BORDER}` }}>
+              <div key={lap.lapIndex} style={{ display: "grid", gridTemplateColumns: "3fr 2.5fr 1fr 2.5fr 2fr", alignItems: "center", padding: "9px 0", borderBottom: `1px solid ${bdr}` }}>
                 <span style={{ fontFamily: "system-ui, sans-serif", fontSize: 11, color: TEXT, display: "flex", alignItems: "center", gap: 5 }}>
                   {lapDistanceLabel(lap.distance)}
                   {isFastest && <span style={{ background: ACCENT, color: "#000", fontSize: 7, fontWeight: 800, padding: "2px 5px", borderRadius: 4 }}>FAST</span>}
