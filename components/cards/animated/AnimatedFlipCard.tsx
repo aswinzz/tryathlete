@@ -6,6 +6,7 @@ import { format as fmtDate } from "date-fns";
 
 export interface AnimatedFlipCardProps {
   canvasRef?: React.RefObject<HTMLCanvasElement | null>;
+  name?: string;
   type: string;
   startTime: Date;
   duration: number;
@@ -226,7 +227,7 @@ function drawSep(
 // ─── Component ────────────────────────────────────────────────────────────────
 export function AnimatedFlipCard({
   canvasRef,
-  type, startTime, duration, distance,
+  name, type, startTime, duration, distance,
   avgHeartRate, maxHeartRate, avgPace, calories, elevGain, steps,
   config = DEFAULT_CONFIG,
   animKey = 0,
@@ -249,6 +250,7 @@ export function AnimatedFlipCard({
     const { value: heroValue, unit: heroUnit } = resolveHero(config, actData);
     const stats = resolveStats(config, actData, 3);
     const typeLabel = getActivityTypeLabel(type).toUpperCase();
+    const titleLabel = config.titleMode === "name" && name ? name.toUpperCase() : typeLabel;
     const dateStr = fmtDate(new Date(startTime), "d MMM yyyy").toUpperCase();
 
     // Parse hero string into segments
@@ -316,7 +318,7 @@ export function AnimatedFlipCard({
         ctx.textBaseline = "top";
         ctx.fillStyle = "#c8ff00";
         ctx.textAlign = "left";
-        ctx.fillText(typeLabel, 24 * s, 22 * s);
+        ctx.fillText(titleLabel, 24 * s, 22 * s);
         ctx.fillStyle = "rgba(255,255,255,0.35)";
         ctx.textAlign = "right";
         ctx.fillText(dateStr, CW - 24 * s, 22 * s);
@@ -459,7 +461,7 @@ export function AnimatedFlipCard({
     return () => cancelAnimationFrame(raf);
   }, [
     animKey,
-    type, startTime, duration, distance,
+    name, type, startTime, duration, distance,
     avgPace, avgHeartRate, maxHeartRate, calories, elevGain, steps,
     config,
   ]);

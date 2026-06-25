@@ -8,12 +8,15 @@ import {
 } from "@/lib/utils";
 
 export type HeroStat = "distance" | "time" | "pace";
+export type TitleMode = "type" | "name";
 
 export interface CardConfig {
   hero: HeroStat;
+  titleMode: TitleMode;
   show: {
     pace: boolean;
     time: boolean;
+    distance: boolean;
     heartRate: boolean;
     calories: boolean;
     elevation: boolean;
@@ -24,9 +27,11 @@ export interface CardConfig {
 
 export const DEFAULT_CONFIG: CardConfig = {
   hero: "distance",
+  titleMode: "type",
   show: {
     pace: true,
     time: true,
+    distance: false,
     heartRate: true,
     calories: false,
     elevation: false,
@@ -81,8 +86,17 @@ export function resolveStats(
   const t = data.type.toLowerCase();
   const isSwim = t.includes("swim");
   const isCycle = t.includes("cycl") || t.includes("bike") || t.includes("ride");
+  const isEndurance = getActivityCategory(data.type) === "endurance";
 
   const candidates: { label: string; value: string }[] = [];
+
+  // Distance (only as secondary if hero is not distance)
+  if (config.show.distance && config.hero !== "distance" && data.distance && isEndurance) {
+    if (isSwim)
+      candidates.push({ label: "DISTANCE", value: `${Math.round(data.distance)}m` });
+    else
+      candidates.push({ label: "DISTANCE", value: `${formatDistance(data.distance)} km` });
+  }
 
   // Pace / Speed
   if (config.show.pace && data.avgPace) {
@@ -122,6 +136,12 @@ export function resolveStats(
   return candidates.slice(0, maxStats);
 }
 
+/** Resolve the title string to display based on titleMode */
+export function resolveTitle(config: CardConfig, name: string, type: string): string {
+  if (config.titleMode === "name" && name) return name.toUpperCase();
+  return type; // callers handle getActivityTypeLabel themselves
+}
+
 /** Determine which hero options are available for an activity */
 export function availableHeroOptions(data: ActivityData): HeroStat[] {
   const isEndurance = getActivityCategory(data.type) === "endurance";
@@ -135,6 +155,7 @@ export function availableHeroOptions(data: ActivityData): HeroStat[] {
 export function availableShowToggles(data: ActivityData): (keyof CardConfig["show"])[] {
   const isEndurance = getActivityCategory(data.type) === "endurance";
   const toggles: (keyof CardConfig["show"])[] = [];
+  if (isEndurance && data.distance) toggles.push("distance");
   if (data.avgPace && isEndurance) toggles.push("pace");
   toggles.push("time");
   if (data.avgHeartRate) toggles.push("heartRate");
@@ -146,6 +167,7 @@ export function availableShowToggles(data: ActivityData): (keyof CardConfig["sho
 }
 
 export const TOGGLE_LABELS: Record<keyof CardConfig["show"], string> = {
+  distance: "Distance",
   pace: "Pace",
   time: "Time",
   heartRate: "Heart Rate",
@@ -159,4 +181,9 @@ export const HERO_LABELS: Record<HeroStat, string> = {
   distance: "Distance",
   time: "Time",
   pace: "Pace",
+};
+
+export const TITLE_MODE_LABELS: Record<TitleMode, string> = {
+  type: "Activity Type",
+  name: "Custom Name",
 };

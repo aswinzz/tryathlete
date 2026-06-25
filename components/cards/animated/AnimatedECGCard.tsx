@@ -6,6 +6,7 @@ import { format as fmtDate } from "date-fns";
 
 export interface AnimatedECGCardProps {
   canvasRef?: React.RefObject<HTMLCanvasElement | null>;
+  name?: string;
   type: string;
   startTime: Date;
   duration: number;
@@ -88,7 +89,7 @@ function fmtSec(sec: number) {
 }
 
 export function AnimatedECGCard({
-  canvasRef, type, startTime, duration, distance,
+  canvasRef, name, type, startTime, duration, distance,
   avgHeartRate, maxHeartRate, avgPace, calories, elevGain, steps,
   config = DEFAULT_CONFIG,
   animKey = 0,
@@ -109,6 +110,7 @@ export function AnimatedECGCard({
     const pathPts = buildPath(ECG_CENTER_Y, AMPLITUDE);
 
     const typeLabel = getActivityTypeLabel(type).toUpperCase();
+    const titleLabel = config.titleMode === "name" && name ? name.toUpperCase() : typeLabel;
     const dateStr   = fmtDate(new Date(startTime), "d MMM yyyy").toUpperCase();
     const data = { type, duration, distance, avgPace, avgHeartRate, maxHeartRate, calories, elevGain, steps };
     const stats = resolveStats(config, data, 3);
@@ -165,7 +167,7 @@ export function AnimatedECGCard({
         ctx.textBaseline = "top";
         ctx.textAlign = "left";
         ctx.fillStyle = "rgba(200,255,0,0.55)";
-        ctx.fillText(typeLabel, 20 * s, 18 * s);
+        ctx.fillText(titleLabel, 20 * s, 18 * s);
         ctx.textAlign = "right";
         ctx.fillStyle = "rgba(255,255,255,0.25)";
         ctx.fillText(dateStr, CW - 20 * s, 18 * s);
@@ -300,7 +302,7 @@ export function AnimatedECGCard({
 
     raf = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(raf);
-  }, [animKey, type, startTime, duration, distance, avgPace, avgHeartRate, maxHeartRate, calories, elevGain, steps, config]);
+  }, [animKey, name, type, startTime, duration, distance, avgPace, avgHeartRate, maxHeartRate, calories, elevGain, steps, config]);
 
   return (
     <canvas

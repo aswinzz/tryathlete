@@ -46,7 +46,7 @@ const TEXT2 = "rgba(255,255,255,0.45)";
 const TEXT3 = "rgba(255,255,255,0.25)";
 
 export function DarkCard({
-  cardRef, type, startTime, duration, distance,
+  cardRef, name, type, startTime, duration, distance,
   avgHeartRate, maxHeartRate, avgPace, calories, elevGain, steps,
   laps = [], config = DEFAULT_CONFIG,
 }: DarkCardProps) {
@@ -55,6 +55,7 @@ export function DarkCard({
   const isCycle = t.includes("cycl") || t.includes("bike") || t.includes("ride");
 
   const typeLabel = getActivityTypeLabel(type).toUpperCase();
+  const titleLabel = config.titleMode === "name" && name ? name.toUpperCase() : typeLabel;
   const dateStr = format(new Date(startTime), "MMM d, yyyy").toUpperCase();
   const timeStr = format(new Date(startTime), "HH:mm");
 
@@ -72,7 +73,7 @@ export function DarkCard({
     <div ref={cardRef} style={{ background: BG, borderRadius: 20, overflow: "hidden", padding: "24px 22px 28px", width: "100%", boxSizing: "border-box" }}>
       <div style={{ width: 48, height: 3, background: ACCENT, borderRadius: 2, marginBottom: 16 }} />
       <p style={{ fontFamily: "system-ui, sans-serif", fontSize: 10, fontWeight: 700, color: ACCENT, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 10 }}>
-        {typeLabel} · {dateStr} · {timeStr}
+        {titleLabel} · {dateStr} · {timeStr}
       </p>
       <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 20 }}>
         <span style={{ fontFamily: "system-ui, sans-serif", fontSize: 64, fontWeight: 900, color: TEXT, lineHeight: 1 }}>{heroValue}</span>

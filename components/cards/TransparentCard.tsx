@@ -35,11 +35,12 @@ const SHADOW_MD = "0 2px 16px rgba(0,0,0,0.65)";
 const ACCENT = "#c8ff00";
 
 export function TransparentCard({
-  cardRef, type, startTime, duration, distance,
+  cardRef, name, type, startTime, duration, distance,
   avgHeartRate, maxHeartRate, avgPace, calories, elevGain, steps,
   config = DEFAULT_CONFIG,
 }: TransparentCardProps) {
   const typeLabel = getActivityTypeLabel(type).toUpperCase();
+  const titleLabel = config.titleMode === "name" && name ? name.toUpperCase() : typeLabel;
   const dateStr = format(new Date(startTime), "MMM d, yyyy").toUpperCase();
   const timeStr = format(new Date(startTime), "HH:mm");
 
@@ -50,7 +51,7 @@ export function TransparentCard({
   return (
     <div ref={cardRef} style={{ padding: "28px 24px 24px", width: "100%", boxSizing: "border-box", display: "flex", flexDirection: "column", gap: 0 }}>
       <p style={{ fontFamily: "system-ui, sans-serif", fontSize: 11, fontWeight: 700, color: "rgba(255,255,255,0.7)", letterSpacing: "0.18em", textTransform: "uppercase", textShadow: SHADOW_SM, marginBottom: 10, textAlign: "center" }}>
-        {typeLabel} · {dateStr} · {timeStr}
+        {titleLabel} · {dateStr} · {timeStr}
       </p>
 
       <div style={{ textAlign: "center", marginBottom: 16 }}>
@@ -60,7 +61,7 @@ export function TransparentCard({
 
       {stats.length > 0 && (
         <>
-          <div style={{ height: 1, background: "rgba(255,255,255,0.3)", margin: "0 8px 16px", boxShadow: "0 1px 4px rgba(0,0,0,0.4)" }} />
+          <div style={{ height: 1, background: "rgba(255,255,255,0.3)", margin: "0 8px 16px" }} />
           <div style={{ display: "flex", justifyContent: "center", gap: 0, marginBottom: 8 }}>
             {stats.map(({ label, value }, i) => (
               <div key={label} style={{ flex: 1, textAlign: "center", borderLeft: i > 0 ? "1px solid rgba(255,255,255,0.25)" : "none", padding: "0 12px" }}>

@@ -6,6 +6,7 @@ import { format as fmtDate } from "date-fns";
 
 export interface AnimatedCountCardProps {
   canvasRef?: React.RefObject<HTMLCanvasElement | null>;
+  name?: string;
   type: string;
   startTime: Date;
   duration: number;
@@ -51,7 +52,7 @@ function lerp01(elapsed: number, start: number, dur: number) {
 
 export function AnimatedCountCard({
   canvasRef,
-  type, startTime, duration, distance,
+  name, type, startTime, duration, distance,
   avgHeartRate, maxHeartRate, avgPace, calories, elevGain, steps,
   config = DEFAULT_CONFIG,
   animKey = 0,
@@ -101,6 +102,7 @@ export function AnimatedCountCard({
     const data = { type, duration, distance, avgPace, avgHeartRate, maxHeartRate, calories, elevGain, steps };
     const stats = resolveStats(config, data, 3);
     const typeLabel = getActivityTypeLabel(type).toUpperCase();
+    const titleLabel = config.titleMode === "name" && name ? name.toUpperCase() : typeLabel;
     const dateStr = fmtDate(new Date(startTime), "d MMM yyyy").toUpperCase();
 
     const s = PR;
@@ -129,7 +131,7 @@ export function AnimatedCountCard({
 
         ctx.fillStyle = "#c8ff00";
         ctx.textAlign = "left";
-        ctx.fillText(typeLabel, 24 * s, 22 * s);
+        ctx.fillText(titleLabel, 24 * s, 22 * s);
 
         ctx.fillStyle = "rgba(255,255,255,0.35)";
         ctx.textAlign = "right";
@@ -219,7 +221,7 @@ export function AnimatedCountCard({
 
     raf = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(raf);
-  }, [animKey, type, startTime, duration, distance, avgPace, avgHeartRate, maxHeartRate, calories, elevGain, steps, config]);
+  }, [animKey, name, type, startTime, duration, distance, avgPace, avgHeartRate, maxHeartRate, calories, elevGain, steps, config]);
 
   return (
     <canvas

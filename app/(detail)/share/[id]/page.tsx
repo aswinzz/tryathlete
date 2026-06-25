@@ -24,6 +24,7 @@ import {
   DEFAULT_CONFIG,
   HERO_LABELS,
   TOGGLE_LABELS,
+  TITLE_MODE_LABELS,
   availableHeroOptions,
   availableShowToggles,
 } from "@/lib/cardConfig";
@@ -100,6 +101,10 @@ export default function SharePage() {
   const [receiptKey, setReceiptKey] = useState(0);
   const [animKey, setAnimKey] = useState(0);
   const [config, setConfig] = useState<CardConfig>(DEFAULT_CONFIG);
+  // Activity name editing
+  const [editingName, setEditingName] = useState(false);
+  const [nameInput, setNameInput] = useState("");
+  const [nameSaving, setNameSaving] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);         // receipt element ref (for video capture sizing)
   const exportWrapperRef = useRef<HTMLDivElement>(null); // 9:16 wrapper — captured for static PNGs
   const animCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -118,6 +123,27 @@ export default function SharePage() {
   function toggleStat(key: keyof CardConfig["show"]) {
     setConfig((c) => ({ ...c, show: { ...c.show, [key]: !c.show[key] } }));
   }
+  function setTitleMode(titleMode: CardConfig["titleMode"]) {
+    setConfig((c) => ({ ...c, titleMode }));
+  }
+
+  async function saveName() {
+    if (!nameInput.trim() || !activity) return;
+    setNameSaving(true);
+    try {
+      const res = await fetch(`/api/activities/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: nameInput.trim() }),
+      });
+      if (res.ok) {
+        setActivity((a) => a ? { ...a, name: nameInput.trim() } : a);
+        setEditingName(false);
+      }
+    } finally {
+      setNameSaving(false);
+    }
+  }
 
   useEffect(() => {
     fetch(`/api/activities/${id}`)
@@ -128,15 +154,46 @@ export default function SharePage() {
 
   const activeFormat = FORMATS.find((f) => f.id === format)!;
 
-  /** Static PNG capture — always uses the 9:16 export wrapper. */
+  /** Static PNG capture — uses 9:16 wrapper for all formats; receipt gets canvas composition. */
   async function captureImage(): Promise<string | null> {
+    const { toPng } = await import("html-to-image");
+
+    // ── Receipt: capture at natural size then compose centred onto 9:16 canvas ──
+    if (format === "receipt") {
+      const el = cardRef.current;
+      if (!el) return null;
+      let receiptDataUrl: string;
+      try {
+        receiptDataUrl = await toPng(el, { pixelRatio: 2, backgroundColor: "#FAFAF8" });
+      } catch { return null; }
+
+      return new Promise<string | null>((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          const W = 1080, H = 1920; // 9:16 at 3× resolution
+          const canvas = document.createElement("canvas");
+          canvas.width = W; canvas.height = H;
+          const ctx = canvas.getContext("2d")!;
+          ctx.fillStyle = "#FAFAF8";
+          ctx.fillRect(0, 0, W, H);
+          // Scale to fill width, centre vertically
+          const scale = W / img.width;
+          const drawH = img.height * scale;
+          const drawY = Math.round((H - drawH) / 2);
+          ctx.drawImage(img, 0, drawY, W, drawH);
+          resolve(canvas.toDataURL("image/png"));
+        };
+        img.onerror = () => resolve(null);
+        img.src = receiptDataUrl;
+      });
+    }
+
+    // ── All other static formats: capture the 9:16 export wrapper ──
     const el = exportWrapperRef.current;
     if (!el) return null;
-    const { toPng } = await import("html-to-image");
     const opts: Parameters<typeof toPng>[1] = {
       quality: 1,
       pixelRatio: 3,
-      // Skip preview-only UI (e.g. checkerboard behind overlay cards)
       filter: (node: Node) =>
         !(node instanceof Element && node.classList.contains("preview-only")),
     };
@@ -503,7 +560,7 @@ export default function SharePage() {
   return (
     <div className="flex flex-col min-h-dvh">
       {/* Top bar */}
-      <div className="flex items-center justify-between px-5 pt-14 pb-5">
+      <div className="flex items-center justify-between px-5 pt-14 pb-3">
         <button
           onClick={() => router.back()}
           className="text-sm font-semibold text-[var(--text-2)] hover:text-white transition-colors flex items-center gap-1.5"
@@ -513,6 +570,43 @@ export default function SharePage() {
         </button>
         <h1 className="text-base font-bold text-white">Share</h1>
         <div className="w-16" />
+      </div>
+
+      {/* Activity name editor */}
+      <div className="px-5 pb-4">
+        {editingName ? (
+          <div className="flex items-center gap-2">
+            <input
+              autoFocus
+              value={nameInput}
+              onChange={(e) => setNameInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") saveName(); if (e.key === "Escape") setEditingName(false); }}
+              className="flex-1 bg-[var(--surface-2)] text-white text-sm font-semibold rounded-xl px-3 py-2 outline-none border border-[var(--accent)]"
+              placeholder="Activity name…"
+            />
+            <button
+              onClick={saveName}
+              disabled={nameSaving}
+              className="text-xs font-bold px-3 py-2 rounded-xl bg-[var(--accent)] text-black"
+            >
+              {nameSaving ? "…" : "Save"}
+            </button>
+            <button
+              onClick={() => setEditingName(false)}
+              className="text-xs font-semibold px-3 py-2 rounded-xl bg-[var(--surface-2)] text-[var(--text-2)]"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => { setNameInput(activity.name); setEditingName(true); }}
+            className="flex items-center gap-2 group"
+          >
+            <span className="text-sm font-semibold text-white truncate max-w-[220px]">{activity.name}</span>
+            <span className="text-[10px] font-semibold text-[var(--accent)] opacity-60 group-hover:opacity-100 transition-opacity">Edit</span>
+          </button>
+        )}
       </div>
 
       {/* Format picker */}
@@ -587,6 +681,25 @@ export default function SharePage() {
         const showToggles = availableShowToggles(activityData);
         return (
           <div className="px-5 mb-4 space-y-3">
+            {/* Title display mode */}
+            <div>
+              <p className="text-[9px] font-bold text-[var(--text-3)] uppercase tracking-widest mb-2">Title</p>
+              <div className="flex gap-2">
+                {(["type", "name"] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    onClick={() => setTitleMode(mode)}
+                    className="text-[11px] font-semibold px-3 py-1.5 rounded-full transition-all"
+                    style={{
+                      background: config.titleMode === mode ? "var(--accent)" : "var(--surface-2)",
+                      color: config.titleMode === mode ? "#000" : "var(--text-2)",
+                    }}
+                  >
+                    {TITLE_MODE_LABELS[mode]}
+                  </button>
+                ))}
+              </div>
+            </div>
             {/* Hero stat */}
             {heroOptions.length > 1 && (
               <div>
@@ -638,8 +751,13 @@ export default function SharePage() {
       {/* Card preview */}
       <div className="flex-1 overflow-y-auto px-5 pb-4">
 
-        {/* ── Static card formats — wrapped in a 9:16 export container ── */}
-        {!isReceiptAnim && !isCanvasAnim && (
+        {/* ── Receipt: natural height preview (export composes onto 9:16 canvas) ── */}
+        {format === "receipt" && (
+          <RunReceipt receiptRef={cardRef} orderNumber={activity.id.slice(-4).toUpperCase()} {...sharedProps} />
+        )}
+
+        {/* ── Other static card formats — wrapped in a 9:16 export container ── */}
+        {!isReceiptAnim && !isCanvasAnim && format !== "receipt" && (
           <div
             ref={exportWrapperRef}
             className="export-wrap"
@@ -654,9 +772,6 @@ export default function SharePage() {
               background: activeFormat.bg ?? "transparent",
             }}
           >
-            {format === "receipt" && (
-              <RunReceipt receiptRef={cardRef} orderNumber={activity.id.slice(-4).toUpperCase()} {...sharedProps} />
-            )}
             {format === "dark"    && <DarkCard    cardRef={cardRef} config={config} {...sharedProps} />}
             {format === "neon"    && <NeonCard    cardRef={cardRef} config={config} {...sharedProps} />}
             {format === "night"   && <NightCard   cardRef={cardRef} config={config} {...sharedProps} />}

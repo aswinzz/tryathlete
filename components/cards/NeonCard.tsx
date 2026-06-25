@@ -46,7 +46,7 @@ const TEXT = "#ffffff";
 const TEXT2 = "rgba(255,255,255,0.4)";
 
 export function NeonCard({
-  cardRef, type, startTime, duration, distance,
+  cardRef, name, type, startTime, duration, distance,
   avgHeartRate, maxHeartRate, avgPace, calories, elevGain, steps,
   laps = [], config = DEFAULT_CONFIG,
 }: NeonCardProps) {
@@ -55,6 +55,7 @@ export function NeonCard({
   const isCycle = t.includes("cycl") || t.includes("bike") || t.includes("ride");
 
   const typeLabel = getActivityTypeLabel(type).toUpperCase();
+  const titleLabel = config.titleMode === "name" && name ? name.toUpperCase() : typeLabel;
   const dateStr = format(new Date(startTime), "MMM d, yyyy").toUpperCase();
   const timeStr = format(new Date(startTime), "HH:mm");
 
@@ -71,7 +72,7 @@ export function NeonCard({
   return (
     <div ref={cardRef} style={{ background: BG, borderRadius: 20, overflow: "hidden", padding: "24px 22px 28px", width: "100%", boxSizing: "border-box", border: `1px solid ${BORDER_ACCENT}` }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
-        <span style={{ fontFamily: "system-ui, sans-serif", fontSize: 10, fontWeight: 700, color: ACCENT, letterSpacing: "0.16em", textTransform: "uppercase" }}>{typeLabel}</span>
+        <span style={{ fontFamily: "system-ui, sans-serif", fontSize: 10, fontWeight: 700, color: ACCENT, letterSpacing: "0.16em", textTransform: "uppercase" }}>{titleLabel}</span>
         <span style={{ fontFamily: "system-ui, sans-serif", fontSize: 10, color: TEXT2, letterSpacing: "0.08em" }}>{dateStr} · {timeStr}</span>
       </div>
       <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 20 }}>

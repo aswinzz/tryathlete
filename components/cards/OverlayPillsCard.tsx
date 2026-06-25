@@ -26,11 +26,12 @@ const SHADOW = "0 2px 12px rgba(0,0,0,0.5)";
 const ACCENT = "#c8ff00";
 
 export function OverlayPillsCard({
-  cardRef, type, startTime, duration, distance,
+  cardRef, name, type, startTime, duration, distance,
   avgHeartRate, maxHeartRate, avgPace, calories, elevGain, steps,
   config = DEFAULT_CONFIG,
 }: OverlayPillsCardProps) {
   const typeLabel = getActivityTypeLabel(type).toUpperCase();
+  const titleLabel = config.titleMode === "name" && name ? name.toUpperCase() : typeLabel;
   const dateStr = format(new Date(startTime), "MMM d, yyyy").toUpperCase();
 
   const data = { type, duration, distance, avgPace, avgHeartRate, maxHeartRate, calories, elevGain, steps };
@@ -42,7 +43,7 @@ export function OverlayPillsCard({
     <div ref={cardRef} style={{ width: "100%", padding: "40px 20px 40px", boxSizing: "border-box", display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
       {/* Type + date pill */}
       <div style={{ background: PILL_BG, borderRadius: 100, padding: "6px 16px", display: "inline-flex", alignItems: "center", gap: 8, boxShadow: SHADOW }}>
-        <span style={{ fontFamily: "system-ui, sans-serif", fontSize: 11, fontWeight: 700, color: ACCENT, letterSpacing: "0.12em" }}>{typeLabel}</span>
+        <span style={{ fontFamily: "system-ui, sans-serif", fontSize: 11, fontWeight: 700, color: ACCENT, letterSpacing: "0.12em" }}>{titleLabel}</span>
         <span style={{ width: 3, height: 3, borderRadius: "50%", background: "rgba(255,255,255,0.25)", display: "inline-block" }} />
         <span style={{ fontFamily: "system-ui, sans-serif", fontSize: 11, color: "rgba(255,255,255,0.55)", letterSpacing: "0.06em" }}>{dateStr}</span>
       </div>

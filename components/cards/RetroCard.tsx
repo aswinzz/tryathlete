@@ -47,7 +47,7 @@ const MONO: React.CSSProperties = { fontFamily: "'Courier New', Courier, monospa
 const SANS: React.CSSProperties = { fontFamily: "system-ui, sans-serif" };
 
 export function RetroCard({
-  cardRef, type, startTime, duration, distance,
+  cardRef, name, type, startTime, duration, distance,
   avgHeartRate, maxHeartRate, avgPace, calories, elevGain, steps,
   laps = [], config = DEFAULT_CONFIG,
 }: RetroCardProps) {
@@ -56,6 +56,7 @@ export function RetroCard({
   const isCycle = t.includes("cycl") || t.includes("bike") || t.includes("ride");
 
   const typeLabel = getActivityTypeLabel(type).toUpperCase();
+  const titleLabel = config.titleMode === "name" && name ? name.toUpperCase() : typeLabel;
   const dateStr = format(new Date(startTime), "MMMM d, yyyy").toUpperCase();
   const dayStr = format(new Date(startTime), "EEEE").toUpperCase();
   const timeStr = format(new Date(startTime), "HH:mm");
@@ -77,7 +78,7 @@ export function RetroCard({
         <p style={{ ...SANS, fontSize: 8, fontWeight: 700, color: TEXT2, letterSpacing: "0.22em", textTransform: "uppercase", marginBottom: 4 }}>
           {dayStr} · {dateStr} · {timeStr}
         </p>
-        <p style={{ ...SANS, fontSize: 22, fontWeight: 900, color: TEXT, letterSpacing: "0.05em", lineHeight: 1 }}>{typeLabel}</p>
+        <p style={{ ...SANS, fontSize: 22, fontWeight: 900, color: TEXT, letterSpacing: "0.05em", lineHeight: 1 }}>{titleLabel}</p>
         <p style={{ ...SANS, fontSize: 8, fontWeight: 700, color: TEXT2, letterSpacing: "0.22em", textTransform: "uppercase", marginTop: 4 }}>
           PERSONAL RECORD EDITION
         </p>

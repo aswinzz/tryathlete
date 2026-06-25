@@ -6,6 +6,7 @@ import { format as fmtDate } from "date-fns";
 
 export interface AnimatedTerminalCardProps {
   canvasRef?: React.RefObject<HTMLCanvasElement | null>;
+  name?: string;
   type: string;
   startTime: Date;
   duration: number;
@@ -93,7 +94,7 @@ function drawTyped(
 // ─── Component ────────────────────────────────────────────────────────────────
 export function AnimatedTerminalCard({
   canvasRef,
-  type, startTime, duration, distance,
+  name, type, startTime, duration, distance,
   avgHeartRate, maxHeartRate, avgPace, calories, elevGain, steps,
   config = DEFAULT_CONFIG,
   animKey = 0,
@@ -116,6 +117,7 @@ export function AnimatedTerminalCard({
     const { value: heroValue, unit: heroUnit } = resolveHero(config, actData);
     const stats = resolveStats(config, actData, 3);
     const typeLabel = getActivityTypeLabel(type).toUpperCase();
+    const titleLabel = config.titleMode === "name" && name ? name.toUpperCase() : typeLabel;
     const dateStr = fmtDate(new Date(startTime), "d MMM yyyy").toUpperCase();
 
     // ── Font sizes (logical → canvas) ────────────────────────────────────
@@ -140,7 +142,7 @@ export function AnimatedTerminalCard({
     const PX        = 22 * s;   // left margin
 
     // ── Text content ──────────────────────────────────────────────────────
-    const COMMENT  = `# ${typeLabel} · ${dateStr}`;
+    const COMMENT  = `# ${titleLabel} · ${dateStr}`;
     const PROMPT   = "$ tryathlete --share";
     const LOAD_TXT = "> loading activity...";
     const BAR_LEN  = 22;
@@ -317,7 +319,7 @@ export function AnimatedTerminalCard({
     return () => cancelAnimationFrame(raf);
   }, [
     animKey,
-    type, startTime, duration, distance,
+    name, type, startTime, duration, distance,
     avgPace, avgHeartRate, maxHeartRate, calories, elevGain, steps,
     config,
   ]);

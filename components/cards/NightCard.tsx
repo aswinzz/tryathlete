@@ -47,7 +47,7 @@ const TEXT2 = "rgba(241,245,249,0.45)";
 const TEXT3 = "rgba(241,245,249,0.2)";
 
 export function NightCard({
-  cardRef, type, startTime, duration, distance,
+  cardRef, name, type, startTime, duration, distance,
   avgHeartRate, maxHeartRate, avgPace, calories, elevGain, steps,
   laps = [], config = DEFAULT_CONFIG,
 }: NightCardProps) {
@@ -56,6 +56,7 @@ export function NightCard({
   const isCycle = t.includes("cycl") || t.includes("bike") || t.includes("ride");
 
   const typeLabel = getActivityTypeLabel(type).toUpperCase();
+  const titleLabel = config.titleMode === "name" && name ? name.toUpperCase() : typeLabel;
   const dateStr = format(new Date(startTime), "MMM d, yyyy").toUpperCase();
   const timeStr = format(new Date(startTime), "HH:mm");
 
@@ -81,7 +82,7 @@ export function NightCard({
         <span style={{ width: 8, height: 8, borderRadius: "50%", background: "rgba(129,140,248,0.25)", display: "inline-block" }} />
       </div>
       <p style={{ fontFamily: "system-ui, sans-serif", fontSize: 10, fontWeight: 700, color: ACCENT, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 10 }}>
-        {typeLabel} · {dateStr} · {timeStr}
+        {titleLabel} · {dateStr} · {timeStr}
       </p>
       <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginBottom: 20 }}>
         <span style={{ fontFamily: "system-ui, sans-serif", fontSize: 64, fontWeight: 900, color: TEXT, lineHeight: 1 }}>{heroValue}</span>

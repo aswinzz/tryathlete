@@ -36,11 +36,12 @@ const TEXT = "#0a0a0a";
 const TEXT2 = "#888888";
 
 export function MinimalCard({
-  cardRef, type, startTime, duration, distance,
+  cardRef, name, type, startTime, duration, distance,
   avgHeartRate, maxHeartRate, avgPace, calories, elevGain, steps,
   laps = [], config = DEFAULT_CONFIG,
 }: MinimalCardProps) {
   const typeLabel = getActivityTypeLabel(type);
+  const titleLabel = config.titleMode === "name" && name ? name : typeLabel;
   const dateStr = format(new Date(startTime), "MMMM d, yyyy");
   const timeStr = format(new Date(startTime), "h:mm a");
 
@@ -52,7 +53,7 @@ export function MinimalCard({
   return (
     <div ref={cardRef} style={{ background: BG, borderRadius: 20, overflow: "hidden", padding: "32px 28px 32px", width: "100%", boxSizing: "border-box", border: `1px solid ${BORDER}` }}>
       <p style={{ fontFamily: "system-ui, sans-serif", fontSize: 11, color: TEXT2, letterSpacing: "0.04em", marginBottom: 24 }}>
-        {typeLabel} · {dateStr} · {timeStr}
+        {titleLabel} · {dateStr} · {timeStr}
       </p>
 
       <div style={{ marginBottom: 32 }}>

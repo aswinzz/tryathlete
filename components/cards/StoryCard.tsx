@@ -43,7 +43,7 @@ const TEXT = "#ffffff";
 const TEXT2 = "rgba(255,255,255,0.45)";
 
 export function StoryCard({
-  cardRef, type, startTime, duration, distance,
+  cardRef, name, type, startTime, duration, distance,
   avgHeartRate, maxHeartRate, avgPace, calories, elevGain, steps,
   laps = [], config = DEFAULT_CONFIG,
 }: StoryCardProps) {
@@ -52,6 +52,7 @@ export function StoryCard({
   const isCycle = t.includes("cycl") || t.includes("bike") || t.includes("ride");
 
   const typeLabel = getActivityTypeLabel(type).toUpperCase();
+  const titleLabel = config.titleMode === "name" && name ? name.toUpperCase() : typeLabel;
   const dateStr = format(new Date(startTime), "MMM d, yyyy").toUpperCase();
   const timeStr = format(new Date(startTime), "HH:mm");
 
@@ -76,7 +77,7 @@ export function StoryCard({
 
       <div style={{ position: "relative" }}>
         <p style={{ fontFamily: "system-ui, sans-serif", fontSize: 11, fontWeight: 600, color: TEXT2, letterSpacing: "0.14em", textTransform: "uppercase" }}>
-          {typeLabel}
+          {titleLabel}
         </p>
       </div>
 
