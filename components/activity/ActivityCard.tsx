@@ -77,7 +77,7 @@ export function ActivityCard({
   }
 
   return (
-    <div className="relative bg-[var(--surface-2)] rounded-2xl overflow-hidden">
+    <div className="relative bg-[var(--surface-2)] rounded-2xl overflow-hidden transition-transform active:scale-[0.985]">
       {/* Left zone bar */}
       <div
         className="absolute left-0 top-0 bottom-0 w-1 rounded-l-2xl"
@@ -107,7 +107,7 @@ export function ActivityCard({
           </div>
           <Link
             href={`/share/${id}`}
-            className="text-[var(--text-3)] hover:text-[var(--accent)] transition-colors p-1.5"
+            className="text-[var(--text-3)] hover:text-[var(--accent)] transition-colors p-1.5 active:scale-90"
             title="Share"
           >
             <Share2 size={16} />
@@ -132,8 +132,12 @@ export function ActivityCard({
         )}
       </div>
 
-      {/* Tap to view */}
-      <Link href={`/activity/${id}`} className="absolute inset-0" aria-label={`View ${name}`} />
+      {/* Tap to view — active state gives instant press feedback */}
+      <Link
+        href={`/activity/${id}`}
+        className="absolute inset-0 rounded-2xl transition-opacity active:opacity-60"
+        aria-label={`View ${name}`}
+      />
     </div>
   );
 }

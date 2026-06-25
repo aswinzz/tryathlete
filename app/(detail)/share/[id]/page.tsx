@@ -563,7 +563,7 @@ export default function SharePage() {
       <div className="flex items-center justify-between px-5 pt-14 pb-3">
         <button
           onClick={() => router.back()}
-          className="text-sm font-semibold text-[var(--text-2)] hover:text-white transition-colors flex items-center gap-1.5"
+          className="text-sm font-semibold text-[var(--text-2)] hover:text-white transition-all active:opacity-50 flex items-center gap-1.5"
         >
           <ArrowLeft size={16} />
           Back

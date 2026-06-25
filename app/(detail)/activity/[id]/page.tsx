@@ -111,7 +111,7 @@ export default async function ActivityDetailPage({
       <div className="flex items-center justify-between px-5 pt-14 pb-5">
         <Link
           href="/dashboard"
-          className="text-sm font-semibold text-[var(--text-2)] hover:text-white transition-colors"
+          className="text-sm font-semibold text-[var(--text-2)] hover:text-white transition-all active:opacity-50"
         >
           ← Feed
         </Link>
@@ -263,7 +263,7 @@ export default async function ActivityDetailPage({
       {/* Share bar — fixed at bottom */}
       <div className="sticky bottom-0 px-5 pb-10 pt-5 bg-[var(--bg)] border-t border-[var(--border)]">
         <div className="flex gap-3">
-          <Link href={`/share/${activity.id}`} className="flex-1">
+          <Link href={`/share/${activity.id}`} className="flex-1 active:opacity-70 transition-opacity">
             <Button variant="accent" size="lg" fullWidth>
               <Share2 size={15} />
               Share This {isRun ? "Run" : isSwim ? "Swim" : isCycle ? "Ride" : "Workout"}
