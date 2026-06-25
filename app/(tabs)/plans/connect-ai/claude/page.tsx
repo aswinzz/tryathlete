@@ -27,7 +27,9 @@ export default async function ClaudeSetupPage() {
   }
 
   const slug = user!.name?.toLowerCase().replace(/\s+/g, "") || userId.slice(0, 8);
-  const mcpUrl = `https://mcp.tryathlete.com/u/${slug}?token=${user!.mcpToken}`;
+  // In production this hits the app's own domain; swap host for a custom subdomain later
+  const host = process.env.NEXTAUTH_URL || "https://tryathlete.com";
+  const mcpUrl = `${host}/api/mcp/u/${slug}?token=${user!.mcpToken}`;
   const configJson = JSON.stringify(
     { mcpServers: { tryathlete: { url: mcpUrl } } },
     null,

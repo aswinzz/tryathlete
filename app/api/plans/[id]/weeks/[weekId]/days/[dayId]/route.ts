@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { DayType, DayStatus } from "@prisma/client";
+import { DayType, DayStatus } from "@/lib/planEnums";
 
 type Ctx = { params: Promise<{ id: string; weekId: string; dayId: string }> };
 
