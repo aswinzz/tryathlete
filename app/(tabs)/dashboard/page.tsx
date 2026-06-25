@@ -2,20 +2,37 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ActivityCard } from "@/components/activity/ActivityCard";
-import { Card, CardContent } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Bell } from "lucide-react";
 import { SyncButton } from "@/components/dashboard/SyncButton";
+import { OverallStatsCard } from "@/components/dashboard/OverallStatsCard";
+import type { TypeTab, AllTypeStats, TypeStats } from "@/components/dashboard/OverallStatsCard";
 import Link from "next/link";
-import { formatDuration, getHRZone } from "@/lib/utils";
-import { startOfWeek, endOfWeek, format as dateFmt } from "date-fns";
+import { getHRZone } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
+
+/** Map an activity type string to one of the 5 dashboard tabs, or null if unrecognised. */
+function classifyType(type: string): TypeTab | null {
+  const t = type.toLowerCase();
+  if (t.includes("run")) return "RUNS";
+  if (t.includes("cycl") || t.includes("bike") || t.includes("ride")) return "CYCLING";
+  if (t.includes("swim")) return "SWIMMING";
+  if (t.includes("strength") || t.includes("gym") || t.includes("weight") || t.includes("functional_strength")) return "STRENGTH";
+  if (t.includes("hiit") || t.includes("crossfit") || t.includes("circuit") || t.includes("cardio") || t.includes("interval")) return "HIIT";
+  return null;
+}
+
+const EMPTY_STATS: TypeStats = {
+  count: 0, totalDistanceM: 0, totalDurationS: 0, totalCalories: 0,
+  avgPaceSpM: null, avgSpeedMps: null, avgHeartRate: null,
+};
 
 export default async function DashboardPage() {
   const session = await auth();
   const userId = session!.user!.id!;
 
+  // Recent activities for the feed
   const activities = await prisma.activity.findMany({
     where: { userId },
     orderBy: { startTime: "desc" },
@@ -23,20 +40,57 @@ export default async function DashboardPage() {
     include: { laps: { orderBy: { lapIndex: "asc" }, take: 1 } },
   });
 
-  const now = new Date();
-  const weekStart = startOfWeek(now, { weekStartsOn: 1 });
-  const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
+  // All activities (lightweight) for overall stats aggregation
+  const allActivities = await prisma.activity.findMany({
+    where: { userId },
+    select: {
+      type: true, distance: true, duration: true, calories: true,
+      avgPace: true, avgHeartRate: true,
+    },
+  });
 
-  const weekActivities = activities.filter(
-    (a) => new Date(a.startTime) >= weekStart && new Date(a.startTime) <= weekEnd
-  );
-
-  const weekStats = {
-    runs: weekActivities.filter((a) => a.type.toLowerCase().includes("run")).length,
-    totalKm: weekActivities.reduce((s, a) => s + (a.distance || 0), 0) / 1000,
-    totalTime: weekActivities.reduce((s, a) => s + a.duration, 0),
-    totalKcal: weekActivities.reduce((s, a) => s + (a.calories || 0), 0),
+  // Aggregate into per-tab stats
+  const buckets: Record<TypeTab, {
+    count: number; distM: number; durS: number; kcal: number;
+    paceSum: number; paceCount: number;
+    speedSum: number; speedCount: number;
+    hrSum: number; hrCount: number;
+  }> = {
+    RUNS:     { count: 0, distM: 0, durS: 0, kcal: 0, paceSum: 0, paceCount: 0, speedSum: 0, speedCount: 0, hrSum: 0, hrCount: 0 },
+    CYCLING:  { count: 0, distM: 0, durS: 0, kcal: 0, paceSum: 0, paceCount: 0, speedSum: 0, speedCount: 0, hrSum: 0, hrCount: 0 },
+    SWIMMING: { count: 0, distM: 0, durS: 0, kcal: 0, paceSum: 0, paceCount: 0, speedSum: 0, speedCount: 0, hrSum: 0, hrCount: 0 },
+    STRENGTH: { count: 0, distM: 0, durS: 0, kcal: 0, paceSum: 0, paceCount: 0, speedSum: 0, speedCount: 0, hrSum: 0, hrCount: 0 },
+    HIIT:     { count: 0, distM: 0, durS: 0, kcal: 0, paceSum: 0, paceCount: 0, speedSum: 0, speedCount: 0, hrSum: 0, hrCount: 0 },
   };
+
+  for (const a of allActivities) {
+    const tab = classifyType(a.type);
+    if (!tab) continue;
+    const b = buckets[tab];
+    b.count++;
+    b.distM   += a.distance || 0;
+    b.durS    += a.duration;
+    b.kcal    += a.calories || 0;
+    if (a.avgPace) { b.paceSum += a.avgPace; b.paceCount++; }
+    // derive speed from pace (avgPace = s/m → speed = 1/avgPace m/s)
+    if (a.avgPace) { b.speedSum += 1 / a.avgPace; b.speedCount++; }
+    if (a.avgHeartRate) { b.hrSum += a.avgHeartRate; b.hrCount++; }
+  }
+
+  const overallStats: AllTypeStats = Object.fromEntries(
+    (Object.entries(buckets) as [TypeTab, typeof buckets[TypeTab]][]).map(([tab, b]) => [
+      tab,
+      b.count === 0 ? EMPTY_STATS : ({
+        count: b.count,
+        totalDistanceM: b.distM,
+        totalDurationS: b.durS,
+        totalCalories:  b.kcal,
+        avgPaceSpM:     b.paceCount  > 0 ? b.paceSum  / b.paceCount  : null,
+        avgSpeedMps:    b.speedCount > 0 ? b.speedSum / b.speedCount : null,
+        avgHeartRate:   b.hrCount    > 0 ? b.hrSum    / b.hrCount    : null,
+      } satisfies TypeStats),
+    ])
+  ) as AllTypeStats;
 
   const garminConn = await prisma.trackerConnection.findUnique({
     where: { userId_provider: { userId, provider: "garmin" } },
@@ -61,43 +115,8 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {/* Weekly summary */}
-      <Card accentTop>
-        <CardContent className="p-5">
-          <p className="text-[10px] font-semibold text-[var(--text-2)] uppercase tracking-widest mb-1">
-            This Week
-          </p>
-          <p className="text-[10px] text-[var(--text-3)] mb-3">
-            {dateFmt(weekStart, "MMM d")} – {dateFmt(weekEnd, "MMM d")}
-          </p>
-          <div className="grid grid-cols-4 gap-2 mb-5">
-            {[
-              { v: weekStats.runs.toString(), l: "RUNS" },
-              { v: `${weekStats.totalKm.toFixed(1)}`, l: "KM" },
-              { v: formatDuration(weekStats.totalTime), l: "HRS" },
-              { v: weekStats.totalKcal.toLocaleString(), l: "KCAL" },
-            ].map(({ v, l }, i) => (
-              <div key={i} className={i > 0 ? "border-l border-[var(--border)] pl-3" : ""}>
-                <p className="text-[22px] font-bold text-white leading-tight">{v}</p>
-                <p className="text-[10px] font-semibold text-[var(--text-2)] uppercase tracking-widest mt-1">
-                  {l}
-                </p>
-              </div>
-            ))}
-          </div>
-          <p className="text-[10px] text-[var(--text-3)] mb-2">Weekly goal: 30 KM</p>
-          {/* Progress bar */}
-          <div className="h-1 rounded-full bg-[var(--surface-3)] overflow-hidden">
-            <div
-              className="h-full rounded-full transition-all"
-              style={{
-                width: `${Math.min((weekStats.totalKm / 30) * 100, 100)}%`,
-                background: "var(--accent)",
-              }}
-            />
-          </div>
-        </CardContent>
-      </Card>
+      {/* Per-type overall stats */}
+      <OverallStatsCard stats={overallStats} />
 
       {/* No activities yet */}
       {activities.length === 0 && (
