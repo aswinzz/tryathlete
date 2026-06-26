@@ -63,6 +63,14 @@ export function DeviceSettings({ devices: initial }: Props) {
     const url =
       provider === "garmin" ? "/api/garmin/connect" : `/api/${provider}/disconnect`;
     await fetch(url, { method: "DELETE" });
+    // Optimistically clear connected state so UI updates immediately
+    setDevices((prev) =>
+      prev.map((d) =>
+        d.provider === provider
+          ? { ...d, connected: false, lastSyncAt: null }
+          : d
+      )
+    );
     setDisconnecting(null);
     router.refresh();
   }
@@ -319,7 +327,7 @@ function DeviceCard({
     : "Never synced";
 
   return (
-    <div className="bg-[var(--surface-2)] rounded-2xl overflow-hidden">
+    <div className="bg-[var(--surface-2)] rounded-2xl">
       <div className="flex items-center gap-3 p-4">
         <div
           className="w-11 h-11 rounded-full flex items-center justify-center text-base font-black flex-shrink-0"
@@ -361,7 +369,11 @@ function DeviceCard({
         ) : action}
       </div>
       {/* Below-row expansion (e.g. Garmin credential form) */}
-      {children && <div className="px-4 pb-4">{children}</div>}
+      {children && (
+        <div className="px-4 pb-4 rounded-b-2xl overflow-hidden border-t border-[var(--border)]">
+          {children}
+        </div>
+      )}
     </div>
   );
 }

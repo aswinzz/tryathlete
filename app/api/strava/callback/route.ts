@@ -27,6 +27,20 @@ export async function GET(req: NextRequest) {
     const { accessToken, refreshToken, expiresAt } = await exchangeStravaCode(code, redirectUri);
     const expiry = new Date(expiresAt * 1000);
 
+    // Auto-enable syncActivities unless another provider already owns it
+    const others = await prisma.trackerConnection.findMany({
+      where: { userId, provider: { not: "strava" } },
+    });
+    const anotherSourceActive = others.some((c) => {
+      try {
+        return JSON.parse(c.dataPrefs as string ?? "{}").syncActivities === true;
+      } catch { return false; }
+    });
+    const prefs = {
+      ...DEFAULT_STRAVA_PREFS,
+      syncActivities: !anotherSourceActive,
+    };
+
     await prisma.trackerConnection.upsert({
       where: { userId_provider: { userId, provider: "strava" } },
       update: {
@@ -34,6 +48,7 @@ export async function GET(req: NextRequest) {
         refreshToken,
         tokenExpiry: expiry,
         connectedAt: new Date(),
+        dataPrefs:   JSON.stringify(prefs),
       },
       create: {
         userId,
@@ -41,7 +56,7 @@ export async function GET(req: NextRequest) {
         accessToken,
         refreshToken,
         tokenExpiry: expiry,
-        dataPrefs:   JSON.stringify(DEFAULT_STRAVA_PREFS),
+        dataPrefs:   JSON.stringify(prefs),
       },
     });
   } catch (err) {

@@ -226,9 +226,12 @@ export async function syncStravaData(userId: string) {
   if (!conn) throw new Error("Strava not connected");
 
   const prefs = parseDataPrefs(conn.dataPrefs, DEFAULT_STRAVA_PREFS as Parameters<typeof parseDataPrefs>[1]);
+  console.log(`[strava] sync start — syncActivities=${prefs.syncActivities}, lastSyncAt=${conn.lastSyncAt}`);
 
   if (prefs.syncActivities) {
     await syncStravaActivities(userId, conn.lastSyncAt);
+  } else {
+    console.log("[strava] syncActivities=false — skipping. Go to Settings → Activity Source to enable Strava.");
   }
 
   await prisma.trackerConnection.update({
@@ -240,7 +243,9 @@ export async function syncStravaData(userId: string) {
 async function syncStravaActivities(userId: string, after: Date | null) {
   const perPage = 50;
   let page = 1;
+  let totalImported = 0;
   const afterTs = after ? Math.floor(after.getTime() / 1000) : undefined;
+  console.log(`[strava] fetching activities — after=${after?.toISOString() ?? "all time"}`);
 
   while (true) {
     const query = new URLSearchParams({ per_page: String(perPage), page: String(page) });
@@ -257,7 +262,7 @@ async function syncStravaActivities(userId: string, after: Date | null) {
 
       // Skip if already imported
       const exists = await prisma.activity.findUnique({ where: { stravaId } });
-      if (exists) continue;
+      if (exists) { console.log(`[strava] skip existing ${stravaId}`); continue; }
 
       const sportType   = act.sport_type || act.type;
       const type        = mapStravaType(sportType);
@@ -282,6 +287,8 @@ async function syncStravaActivities(userId: string, after: Date | null) {
           ? Math.round(act.kilojoules / 4.184 * 1000)
           : null;
 
+      console.log(`[strava] importing ${stravaId} — ${act.name} (${sportType})`);
+      totalImported++;
       const created = await prisma.activity.create({
         data: {
           userId,
@@ -336,4 +343,5 @@ async function syncStravaActivities(userId: string, after: Date | null) {
     if (activities.length < perPage) break;
     page++;
   }
+  console.log(`[strava] sync complete — imported ${totalImported} activities`);
 }
