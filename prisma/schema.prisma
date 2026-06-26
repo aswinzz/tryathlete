@@ -86,7 +86,8 @@ model Activity {
   userId      String
   garminId    String?  @unique
   whoopId     String?  @unique
-  source      String   @default("garmin") // "garmin" | "whoop" | "manual"
+  stravaId    String?  @unique
+  source      String   @default("garmin") // "garmin" | "whoop" | "strava" | "manual"
   name        String
   type        String   // "running" | "cycling" | "swimming" | "strength"
   startTime   DateTime

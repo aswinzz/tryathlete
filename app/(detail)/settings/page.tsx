@@ -3,13 +3,10 @@ import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import {
-  parseDataPrefs,
-  DEFAULT_WHOOP_PREFS,
-  DEFAULT_GARMIN_PREFS,
-} from "@/lib/whoop";
+import { parseDataPrefs, DEFAULT_WHOOP_PREFS, DEFAULT_GARMIN_PREFS } from "@/lib/whoop";
+import { DEFAULT_STRAVA_PREFS } from "@/lib/strava";
 import { DeviceSettings } from "./DeviceSettings";
-import { WhoopToast } from "./WhoopToast";
+import { ConnectToast } from "./ConnectToast";
 
 export const dynamic = "force-dynamic";
 
@@ -32,9 +29,7 @@ export default async function SettingsPage({
 
   const garminConn = user.connections.find((c) => c.provider === "garmin");
   const whoopConn  = user.connections.find((c) => c.provider === "whoop");
-
-  const garminPrefs = parseDataPrefs(garminConn?.dataPrefs, DEFAULT_GARMIN_PREFS as typeof DEFAULT_WHOOP_PREFS);
-  const whoopPrefs  = parseDataPrefs(whoopConn?.dataPrefs,  DEFAULT_WHOOP_PREFS);
+  const stravaConn = user.connections.find((c) => c.provider === "strava");
 
   const devices = [
     {
@@ -44,7 +39,7 @@ export default async function SettingsPage({
       icon:       "G",
       connected:  !!garminConn,
       lastSyncAt: garminConn?.lastSyncAt?.toISOString() ?? null,
-      prefs:      garminPrefs,
+      prefs:      parseDataPrefs(garminConn?.dataPrefs, DEFAULT_GARMIN_PREFS as typeof DEFAULT_WHOOP_PREFS),
     },
     {
       provider:   "whoop",
@@ -53,9 +48,22 @@ export default async function SettingsPage({
       icon:       "W",
       connected:  !!whoopConn,
       lastSyncAt: whoopConn?.lastSyncAt?.toISOString() ?? null,
-      prefs:      whoopPrefs,
+      prefs:      parseDataPrefs(whoopConn?.dataPrefs, DEFAULT_WHOOP_PREFS),
+    },
+    {
+      provider:   "strava",
+      label:      "Strava",
+      color:      "#FC4C02",
+      icon:       "S",
+      connected:  !!stravaConn,
+      lastSyncAt: stravaConn?.lastSyncAt?.toISOString() ?? null,
+      prefs:      parseDataPrefs(stravaConn?.dataPrefs, DEFAULT_STRAVA_PREFS as typeof DEFAULT_WHOOP_PREFS),
     },
   ];
+
+  // Which provider just connected/errored?
+  const toastProvider = sp.whoop ? "whoop" : sp.strava ? "strava" : null;
+  const toastType     = sp.whoop ?? sp.strava ?? null;
 
   return (
     <div className="flex flex-col min-h-dvh">
@@ -73,8 +81,12 @@ export default async function SettingsPage({
       </div>
 
       {/* OAuth toast feedback */}
-      {sp.whoop === "connected" && <WhoopToast type="success" />}
-      {sp.whoop === "error"     && <WhoopToast type="error" />}
+      {toastProvider && toastType && (
+        <ConnectToast
+          provider={toastProvider}
+          type={toastType as "connected" | "error"}
+        />
+      )}
 
       <div className="flex-1 px-5 py-7 space-y-8">
         {/* Profile */}

@@ -37,7 +37,8 @@ export function DeviceSettings({ devices: initial }: Props) {
 
   const garmin = devices.find((d) => d.provider === "garmin");
   const whoop  = devices.find((d) => d.provider === "whoop");
-  const bothConnected = garmin?.connected && whoop?.connected;
+  const connectedCount = devices.filter((d) => d.connected).length;
+  const bothConnected = (connectedCount >= 2);
 
   // ── Garmin connect ─────────────────────────────────────────────────────────
   async function connectGarmin(e: React.FormEvent) {
@@ -59,10 +60,9 @@ export function DeviceSettings({ devices: initial }: Props) {
   // ── Disconnect ─────────────────────────────────────────────────────────────
   async function disconnect(provider: string) {
     setDisconnecting(provider);
-    await fetch(
-      provider === "garmin" ? "/api/garmin/connect" : `/api/whoop/disconnect`,
-      { method: "DELETE" }
-    );
+    const url =
+      provider === "garmin" ? "/api/garmin/connect" : `/api/${provider}/disconnect`;
+    await fetch(url, { method: "DELETE" });
     setDisconnecting(null);
     router.refresh();
   }
@@ -177,6 +177,33 @@ export function DeviceSettings({ devices: initial }: Props) {
               ) : undefined
             }
           />
+
+          {/* Strava */}
+          {(() => {
+            const strava = devices.find((d) => d.provider === "strava");
+            return (
+              <DeviceCard
+                label="Strava"
+                sub="Connect via OAuth"
+                color="#FC4C02"
+                icon="S"
+                connected={strava?.connected ?? false}
+                lastSyncAt={strava?.lastSyncAt ?? null}
+                disconnecting={disconnecting === "strava"}
+                onDisconnect={() => disconnect("strava")}
+                action={
+                  !strava?.connected ? (
+                    <a
+                      href="/api/strava/auth"
+                      className="text-xs font-bold text-[var(--accent)] bg-[var(--surface-3)] px-3 py-1.5 rounded-full"
+                    >
+                      Connect
+                    </a>
+                  ) : undefined
+                }
+              />
+            );
+          })()}
         </div>
       </section>
 

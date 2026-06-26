@@ -93,9 +93,10 @@ export default async function DashboardPage() {
     ])
   ) as AllTypeStats;
 
-  const [garminConn, whoopConn] = await Promise.all([
+  const [garminConn, whoopConn, stravaConn] = await Promise.all([
     prisma.trackerConnection.findUnique({ where: { userId_provider: { userId, provider: "garmin" } } }),
     prisma.trackerConnection.findUnique({ where: { userId_provider: { userId, provider: "whoop" } } }),
+    prisma.trackerConnection.findUnique({ where: { userId_provider: { userId, provider: "strava" } } }),
   ]);
 
   // Today's WHOOP recovery (most recent record)
@@ -121,8 +122,8 @@ export default async function DashboardPage() {
           <h1 className="text-2xl font-bold text-white">{name} 👋</h1>
         </div>
         <div className="flex items-center gap-2">
-          {(garminConn || whoopConn) && (
-            <SyncButton hasGarmin={!!garminConn} hasWhoop={!!whoopConn} />
+          {(garminConn || whoopConn || stravaConn) && (
+            <SyncButton hasGarmin={!!garminConn} hasWhoop={!!whoopConn} hasStrava={!!stravaConn} />
           )}
           <button className="relative w-9 h-9 flex items-center justify-center rounded-full bg-[var(--surface-2)] text-[var(--text-2)]">
             <Bell size={15} />

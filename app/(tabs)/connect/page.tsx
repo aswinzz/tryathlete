@@ -10,7 +10,7 @@ const TRACKERS = [
   { id: "whoop",  name: "WHOOP",       sub: "Recovery, sleep & HRV",     color: "#00C851", available: true,  oauth: true  },
   { id: "apple",  name: "Apple Watch", sub: "HealthKit integration",      color: "#9E9E9E", available: false, oauth: false },
   { id: "coros",  name: "COROS",       sub: "COROS training hub",         color: "#FF6B35", available: false, oauth: false },
-  { id: "strava", name: "Strava",      sub: "Import from Strava",         color: "#FC4C02", available: false, oauth: false },
+  { id: "strava", name: "Strava",      sub: "Import from Strava",         color: "#FC4C02", available: true,  oauth: true  },
 ];
 
 export default function ConnectPage() {

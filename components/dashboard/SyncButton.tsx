@@ -6,9 +6,10 @@ import { RefreshCw } from "lucide-react";
 interface Props {
   hasGarmin?: boolean;
   hasWhoop?:  boolean;
+  hasStrava?: boolean;
 }
 
-export function SyncButton({ hasGarmin = true, hasWhoop = false }: Props) {
+export function SyncButton({ hasGarmin = true, hasWhoop = false, hasStrava = false }: Props) {
   const router = useRouter();
   const [syncing, setSyncing] = useState(false);
 
@@ -19,6 +20,7 @@ export function SyncButton({ hasGarmin = true, hasWhoop = false }: Props) {
       const calls: Promise<Response>[] = [];
       if (hasGarmin) calls.push(fetch("/api/garmin/sync", { method: "POST" }));
       if (hasWhoop)  calls.push(fetch("/api/whoop/sync",  { method: "POST" }));
+      if (hasStrava) calls.push(fetch("/api/strava/sync", { method: "POST" }));
       await Promise.allSettled(calls);
       router.refresh();
     } catch {

@@ -9,10 +9,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { parseDataPrefs, DEFAULT_WHOOP_PREFS, DEFAULT_GARMIN_PREFS } from "@/lib/whoop";
+import { DEFAULT_STRAVA_PREFS } from "@/lib/strava";
 
 const DEFAULTS: Record<string, typeof DEFAULT_WHOOP_PREFS> = {
   whoop:  DEFAULT_WHOOP_PREFS,
   garmin: DEFAULT_GARMIN_PREFS as typeof DEFAULT_WHOOP_PREFS,
+  strava: DEFAULT_STRAVA_PREFS as typeof DEFAULT_WHOOP_PREFS,
 };
 
 export async function PATCH(
