@@ -233,6 +233,22 @@ const TOOLS = [
     },
   },
   {
+    name: "get_wellness_today",
+    description: "Get today's WHOOP wellness snapshot: recovery score (0–100), HRV, resting heart rate, sleep duration and quality, and daily strain. Use this before making any training recommendations to understand the athlete's current readiness. Returns null for each field if WHOOP is not connected or data has not synced yet.",
+    inputSchema: { type: "object", properties: {}, required: [] },
+  },
+  {
+    name: "get_wellness_history",
+    description: "Get recent WHOOP wellness history (last N days) to identify trends in recovery, HRV, sleep and strain. Useful for spotting overtraining, improving adaptation, or planning peak/taper weeks.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        days: { type: "number", description: "Number of recent days to return (default: 7, max: 30)" },
+      },
+      required: [],
+    },
+  },
+  {
     name: "populate_plan",
     description: "Populate an entire plan with multiple weeks, days and entries in one call. Use this to build a full training plan at once. Strongly preferred over making individual add_week/add_day/add_entry calls.",
     inputSchema: {
@@ -544,6 +560,146 @@ async function callTool(
       }
 
       return { message: `Plan populated: ${totalWeeks} weeks, ${totalDays} days, ${totalEntries} entries created` };
+    }
+
+    case "get_wellness_today": {
+      const whoopConn = await prisma.trackerConnection.findUnique({
+        where: { userId_provider: { userId, provider: "whoop" } },
+        select: { id: true, lastSyncAt: true },
+      });
+
+      if (!whoopConn) {
+        return {
+          whoopConnected: false,
+          message: "WHOOP is not connected. No wellness data available.",
+        };
+      }
+
+      const record = await prisma.whoopRecovery.findFirst({
+        where: { userId },
+        orderBy: { date: "desc" },
+      });
+
+      if (!record) {
+        return {
+          whoopConnected: true,
+          lastSyncAt: whoopConn.lastSyncAt,
+          message: "WHOOP is connected but no recovery data has synced yet.",
+        };
+      }
+
+      const score = record.recoveryScore;
+      const readiness =
+        score === null ? "unknown" :
+        score >= 67    ? "optimal — green light for hard training" :
+        score >= 34    ? "moderate — steady/aerobic work recommended" :
+                         "low — prioritise recovery, avoid intensity";
+
+      const totalSleepH = record.totalSleepMin
+        ? `${Math.floor(record.totalSleepMin / 60)}h ${record.totalSleepMin % 60}m`
+        : null;
+
+      return {
+        whoopConnected: true,
+        date: record.date.toISOString().split("T")[0],
+        lastSyncAt: whoopConn.lastSyncAt,
+        recovery: {
+          score: record.recoveryScore,
+          readiness,
+          hrv_ms: record.hrv !== null ? Math.round(record.hrv) : null,
+          restingHR_bpm: record.restingHR,
+          spo2_pct: record.spo2,
+          skinTemp_c: record.skinTemp,
+        },
+        sleep: {
+          totalDuration: totalSleepH,
+          totalMinutes: record.totalSleepMin,
+          performanceScore: record.sleepScore,
+          efficiency_pct: record.sleepEff,
+          stages: {
+            deep_min:  record.deepMin,
+            rem_min:   record.remMin,
+            light_min: record.lightMin,
+            awake_min: record.awakeMin,
+          },
+        },
+        strain: {
+          score: record.strain,
+          scale: "0–21 (higher = more cardiovascular load)",
+          kilojoule: record.kilojoule,
+          avgHR_bpm: record.avgHR,
+          maxHR_bpm: record.maxHR,
+        },
+      };
+    }
+
+    case "get_wellness_history": {
+      const limit = Math.min(Math.max(1, Number(args.days) || 7), 30);
+
+      const whoopConn = await prisma.trackerConnection.findUnique({
+        where: { userId_provider: { userId, provider: "whoop" } },
+        select: { id: true },
+      });
+
+      if (!whoopConn) {
+        return { whoopConnected: false, records: [], message: "WHOOP is not connected." };
+      }
+
+      const records = await prisma.whoopRecovery.findMany({
+        where: { userId },
+        orderBy: { date: "desc" },
+        take: limit,
+        select: {
+          date: true, recoveryScore: true, hrv: true, restingHR: true,
+          totalSleepMin: true, sleepScore: true, sleepEff: true,
+          strain: true, avgHR: true, maxHR: true,
+          deepMin: true, remMin: true, lightMin: true,
+        },
+      });
+
+      const scored = records.filter((r) => r.recoveryScore !== null);
+      const avgRecovery = scored.length
+        ? Math.round(scored.reduce((s, r) => s + r.recoveryScore!, 0) / scored.length)
+        : null;
+      const hrvScored = records.filter((r) => r.hrv !== null);
+      const avgHRV = hrvScored.length
+        ? Math.round(hrvScored.reduce((s, r) => s + r.hrv!, 0) / hrvScored.length)
+        : null;
+
+      const trend =
+        scored.length < 3 ? "insufficient data" :
+        (() => {
+          const recent = scored.slice(0, Math.ceil(scored.length / 2));
+          const older  = scored.slice(Math.ceil(scored.length / 2));
+          const recentAvg = recent.reduce((s, r) => s + r.recoveryScore!, 0) / recent.length;
+          const olderAvg  = older.reduce( (s, r) => s + r.recoveryScore!, 0) / older.length;
+          if (recentAvg >= olderAvg + 5) return "improving";
+          if (recentAvg <= olderAvg - 5) return "declining — consider more recovery";
+          return "stable";
+        })();
+
+      return {
+        whoopConnected: true,
+        periodDays: limit,
+        summary: { avgRecoveryScore: avgRecovery, avgHRV_ms: avgHRV, trend },
+        records: records.map((r) => ({
+          date: r.date.toISOString().split("T")[0],
+          recoveryScore: r.recoveryScore,
+          hrv_ms: r.hrv !== null ? Math.round(r.hrv) : null,
+          restingHR_bpm: r.restingHR,
+          sleep: {
+            totalMinutes: r.totalSleepMin,
+            performanceScore: r.sleepScore,
+            efficiency_pct: r.sleepEff,
+            deep_min: r.deepMin,
+            rem_min: r.remMin,
+            light_min: r.lightMin,
+          },
+          strain: r.strain,
+          avgHR_bpm: r.avgHR,
+          maxHR_bpm: r.maxHR,
+        })),
+      };
     }
 
     default:
