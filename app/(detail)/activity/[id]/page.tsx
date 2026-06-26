@@ -41,6 +41,7 @@ export default async function ActivityDetailPage({
   const hrStreamRaw: string | null = (activity as any)?.hrStream ?? null;
   const hrZonesRaw: string | null = (activity as any)?.hrZones ?? null;
   const minHeartRate: number | null = (activity as any)?.minHeartRate ?? null;
+  const stravaId: string | null = (activity as any)?.stravaId ?? null;
 
   if (!activity) notFound();
 
@@ -165,13 +166,23 @@ export default async function ActivityDetailPage({
         </div>
       </div>
 
-      {/* Load Details button — shown when Garmin-backed and any detail is missing */}
+      {/* Load Details — Garmin: route + laps + HR; Strava: HR stream only */}
       {isEndurance && activity.garminId && (!parsedRoutePoints || !hasLaps || !hrZonesRaw) && (
         <LoadDetailsButton
           activityId={activity.id}
           needsRoute={!parsedRoutePoints}
           needsLaps={!hasLaps}
           needsHR={!hrZonesRaw}
+          source="garmin"
+        />
+      )}
+      {stravaId && activity.avgHeartRate && !hrZonesRaw && (
+        <LoadDetailsButton
+          activityId={activity.id}
+          needsRoute={false}
+          needsLaps={false}
+          needsHR={true}
+          source="strava"
         />
       )}
 

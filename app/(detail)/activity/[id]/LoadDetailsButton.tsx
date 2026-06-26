@@ -10,9 +10,10 @@ interface Props {
   needsRoute: boolean;
   needsLaps: boolean;
   needsHR: boolean;
+  source?: "garmin" | "strava";
 }
 
-export function LoadDetailsButton({ activityId, needsRoute, needsLaps, needsHR }: Props) {
+export function LoadDetailsButton({ activityId, needsRoute, needsLaps, needsHR, source = "garmin" }: Props) {
   const router = useRouter();
   const [running, setRunning] = useState(false);
   const [routeState, setRouteState] = useState<StepState>("idle");
@@ -31,8 +32,8 @@ export function LoadDetailsButton({ activityId, needsRoute, needsLaps, needsHR }
     if (needsLaps)             setLapsState("loading");
 
     await Promise.allSettled([
-      // route-sync handles GPS + HR in one call; response carries hrSynced
-      (needsRoute || needsHR) &&
+      // Garmin: route-sync handles GPS + HR in one call
+      source === "garmin" && (needsRoute || needsHR) &&
         fetch(`/api/activities/${activityId}/route-sync`, { method: "POST" })
           .then(async (r) => {
             if (!r.ok) {
@@ -49,7 +50,13 @@ export function LoadDetailsButton({ activityId, needsRoute, needsLaps, needsHR }
             if (needsHR)    setHrState("failed");
           }),
 
-      needsLaps &&
+      // Strava: HR stream only (route already decoded during sync)
+      source === "strava" && needsHR &&
+        fetch(`/api/activities/${activityId}/strava-hr-sync`, { method: "POST" })
+          .then((r) => setHrState(r.ok ? "done" : "failed"))
+          .catch(() => setHrState("failed")),
+
+      source === "garmin" && needsLaps &&
         fetch(`/api/garmin/sync-laps/${activityId}`, { method: "POST" })
           .then((r) => setLapsState(r.ok ? "done" : "failed"))
           .catch(() => setLapsState("failed")),

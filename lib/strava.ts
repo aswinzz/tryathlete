@@ -207,6 +207,62 @@ interface StravaDetailedActivity extends StravaActivity {
   laps: StravaLap[];
 }
 
+interface StravaStreams {
+  time?:      { data: number[] };
+  heartrate?: { data: number[] };
+}
+
+function zoneForBpm(bpm: number, maxHR = 190): number {
+  const p = bpm / maxHR;
+  if (p < 0.6) return 1;
+  if (p < 0.7) return 2;
+  if (p < 0.8) return 3;
+  if (p < 0.9) return 4;
+  return 5;
+}
+
+/** Fetch HR stream from Strava and return hrStream + hrZones JSON strings */
+export async function fetchStravaHR(
+  userId: string,
+  stravaActivityId: string | number
+): Promise<{ hrStream: string | null; hrZones: string | null; minHeartRate: number | null }> {
+  try {
+    const streams = await stravaFetch<StravaStreams>(
+      userId,
+      `/activities/${stravaActivityId}/streams?keys=time,heartrate&key_by_type=true`
+    );
+    const times = streams.time?.data;
+    const bpms  = streams.heartrate?.data;
+    if (!times || !bpms || bpms.length === 0) return { hrStream: null, hrZones: null, minHeartRate: null };
+
+    // Build [{t, bpm}] points — sample to ≤500 pts
+    const step = Math.max(1, Math.floor(bpms.length / 500));
+    const points: { t: number; bpm: number }[] = [];
+    for (let i = 0; i < bpms.length; i += step) {
+      points.push({ t: times[i], bpm: bpms[i] });
+    }
+
+    // Compute zone seconds
+    const zones = { z1: 0, z2: 0, z3: 0, z4: 0, z5: 0 };
+    for (let i = 1; i < times.length; i++) {
+      const dt = times[i] - times[i - 1];
+      const z = zoneForBpm(bpms[i]);
+      (zones as Record<string, number>)[`z${z}`] += dt;
+    }
+
+    const minHR = Math.min(...bpms);
+
+    return {
+      hrStream:    JSON.stringify(points),
+      hrZones:     JSON.stringify(zones),
+      minHeartRate: minHR,
+    };
+  } catch (err) {
+    console.warn(`[strava] HR stream fetch failed for ${stravaActivityId}:`, err instanceof Error ? err.message : err);
+    return { hrStream: null, hrZones: null, minHeartRate: null };
+  }
+}
+
 interface StravaLap {
   lap_index:           number;
   distance:            number;        // meters
@@ -309,7 +365,7 @@ async function syncStravaActivities(userId: string, after: Date | null) {
         },
       });
 
-      // Fetch detailed activity for laps (only for endurance with distance)
+      // Fetch laps + HR stream (endurance with distance)
       if (act.distance > 0 && ["running", "cycling", "swimming"].includes(type)) {
         try {
           const detail = await stravaFetch<StravaDetailedActivity>(
@@ -334,8 +390,23 @@ async function syncStravaActivities(userId: string, after: Date | null) {
             });
           }
         } catch (err) {
-          // Non-fatal — activity is saved, just missing laps
           console.warn(`[strava] laps fetch failed for ${act.id}:`, err instanceof Error ? err.message : err);
+        }
+      }
+
+      // Fetch HR stream for any activity with heart rate data
+      if (act.average_heartrate) {
+        const { hrStream, hrZones, minHeartRate: minHR } = await fetchStravaHR(userId, act.id);
+        if (hrStream || hrZones || minHR) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await (prisma.activity.update as any)({
+            where: { id: created.id },
+            data: {
+              ...(hrStream ? { hrStream } : {}),
+              ...(hrZones  ? { hrZones  } : {}),
+              ...(minHR    ? { minHeartRate: minHR } : {}),
+            },
+          });
         }
       }
     }
