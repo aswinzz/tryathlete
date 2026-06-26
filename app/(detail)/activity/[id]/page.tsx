@@ -17,8 +17,9 @@ import {
   lapDistanceLabel,
 } from "@/lib/utils";
 import { format } from "date-fns";
-import { SyncLapsButton } from "./SyncLapsButton";
+import { LoadDetailsButton } from "./LoadDetailsButton";
 import { RouteDisplay } from "@/components/activity/RouteDisplay";
+import { HRZoneSection } from "@/components/activity/HRZoneSection";
 import { RoutePoint } from "@/lib/routeUtils";
 
 export const dynamic = "force-dynamic";
@@ -35,8 +36,11 @@ export default async function ActivityDetailPage({
     where: { id, userId: session!.user!.id! },
     include: { laps: { orderBy: { lapIndex: "asc" } } },
   });
-  // routePoints added in schema — types update after `prisma generate`
-  const routePointsRaw: string | null = (activity as any)?.routePoints ?? null; // eslint-disable-line @typescript-eslint/no-explicit-any
+  // Fields added after last migration — cast via any until prisma generate runs
+  const routePointsRaw: string | null = (activity as any)?.routePoints ?? null;
+  const hrStreamRaw: string | null = (activity as any)?.hrStream ?? null;
+  const hrZonesRaw: string | null = (activity as any)?.hrZones ?? null;
+  const minHeartRate: number | null = (activity as any)?.minHeartRate ?? null;
 
   if (!activity) notFound();
 
@@ -161,11 +165,20 @@ export default async function ActivityDetailPage({
         </div>
       </div>
 
-      {/* Route map — show for endurance activities with GPS or Garmin ID */}
+      {/* Load Details button — shown when Garmin-backed and any detail is missing */}
+      {isEndurance && activity.garminId && (!parsedRoutePoints || !hasLaps || !hrZonesRaw) && (
+        <LoadDetailsButton
+          activityId={activity.id}
+          needsRoute={!parsedRoutePoints}
+          needsLaps={!hasLaps}
+          needsHR={!hrZonesRaw}
+        />
+      )}
+
+      {/* Route map */}
       {isEndurance && (
         <RouteDisplay
           activityId={activity.id}
-          garminId={activity.garminId ?? null}
           initialRoutePoints={parsedRoutePoints}
         />
       )}
@@ -241,15 +254,12 @@ export default async function ActivityDetailPage({
               </div>
             </>
           ) : (
-            /* No laps — show placeholder + sync button */
-            <div className="flex flex-col items-center gap-3 py-8 text-center">
+            /* No laps — placeholder (Load Details button handles fetching) */
+            <div className="flex flex-col items-center gap-2 py-8 text-center">
               <p className="text-2xl">📊</p>
               <p className="text-sm font-semibold text-[var(--text-2)]">No split data yet</p>
-              <p className="text-xs text-[var(--text-3)] max-w-[200px]">
-                Splits are fetched when you sync. Tap below to load them now.
-              </p>
               {activity.garminId && (
-                <SyncLapsButton activityId={activity.id} />
+                <p className="text-xs text-[var(--text-3)]">Tap Load Details above to fetch splits</p>
               )}
             </div>
           )}
@@ -276,6 +286,19 @@ export default async function ActivityDetailPage({
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* HR Zone section — show whenever we have HR data */}
+      {(hrZonesRaw || hrStreamRaw || minHeartRate || activity.avgHeartRate) && (
+        <div className="mb-6 mt-2">
+          <HRZoneSection
+            hrStream={hrStreamRaw}
+            hrZones={hrZonesRaw}
+            minHeartRate={minHeartRate}
+            avgHeartRate={activity.avgHeartRate}
+            maxHeartRate={activity.maxHeartRate}
+          />
         </div>
       )}
 

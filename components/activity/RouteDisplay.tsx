@@ -4,7 +4,6 @@ import { routeToSvgPath, RoutePoint } from "@/lib/routeUtils";
 
 interface RouteDisplayProps {
   activityId: string;
-  garminId: string | null;
   initialRoutePoints: RoutePoint[] | null;
 }
 
@@ -12,28 +11,8 @@ const ACCENT = "#c8ff00";
 const BG     = "#0d1320";
 const TEXT2  = "rgba(255,255,255,0.4)";
 
-export function RouteDisplay({ activityId, garminId, initialRoutePoints }: RouteDisplayProps) {
-  const [pts, setPts]         = useState<RoutePoint[] | null>(initialRoutePoints);
-  const [loading, setLoading] = useState(false);
-  const [failed, setFailed]   = useState(false);
-
-  async function loadRoute() {
-    setLoading(true);
-    setFailed(false);
-    try {
-      const res = await fetch(`/api/activities/${activityId}/route-sync`, { method: "POST" });
-      const data = await res.json();
-      if (data.routePoints) {
-        setPts(data.routePoints);
-      } else {
-        setFailed(true);
-      }
-    } catch {
-      setFailed(true);
-    } finally {
-      setLoading(false);
-    }
-  }
+export function RouteDisplay({ activityId, initialRoutePoints }: RouteDisplayProps) {
+  const [pts] = useState<RoutePoint[] | null>(initialRoutePoints);
 
   const VW = 400;
   const VH = 260;
@@ -95,30 +74,8 @@ export function RouteDisplay({ activityId, garminId, initialRoutePoints }: Route
             )}
           </svg>
         ) : (
-          <div className="flex flex-col items-center justify-center h-full gap-3 py-8">
-            {loading ? (
-              <>
-                <div className="w-5 h-5 border-2 border-[var(--accent)] border-t-transparent rounded-full animate-spin" />
-                <p className="text-xs" style={{ color: TEXT2 }}>Fetching GPS data…</p>
-              </>
-            ) : failed ? (
-              <>
-                <p style={{ color: TEXT2, fontSize: 12 }}>No GPS data available for this activity.</p>
-              </>
-            ) : garminId ? (
-              <>
-                <p style={{ color: TEXT2, fontSize: 11, fontWeight: 600 }}>Route not loaded yet</p>
-                <button
-                  onClick={loadRoute}
-                  className="text-xs font-bold px-4 py-2 rounded-full"
-                  style={{ background: ACCENT, color: "#000" }}
-                >
-                  Load Route
-                </button>
-              </>
-            ) : (
-              <p style={{ color: TEXT2, fontSize: 12 }}>No GPS data</p>
-            )}
+          <div className="flex flex-col items-center justify-center h-full gap-2 py-8">
+            <p style={{ color: TEXT2, fontSize: 11 }}>Route not loaded yet</p>
           </div>
         )}
       </div>

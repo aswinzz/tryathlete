@@ -14,6 +14,7 @@ export interface AnimatedECGCardProps {
   distance?: number | null;
   avgHeartRate?: number | null;
   maxHeartRate?: number | null;
+  minHeartRate?: number | null;
   avgPace?: number | null;
   calories?: number | null;
   elevGain?: number | null;
@@ -22,6 +23,8 @@ export interface AnimatedECGCardProps {
   config?: CardConfig;
   animKey?: number;
   routePoints?: RoutePoint[] | null;
+  hrStream?: string | null;   // real HR time series — overrides synthetic beat when present
+  maxHR?: number;             // used for zone colouring of real stream
 }
 
 const LW = 360, LH = 640, PR = 2; // 9:16
@@ -90,12 +93,50 @@ function fmtSec(sec: number) {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
+const ZONE_COLORS_ECG: Record<number, string> = {
+  1: "#4ECDC4", 2: "#45B7D1", 3: "#9B59B6", 4: "#FF6B9D", 5: "#FF4757",
+};
+
+function zoneForBpmECG(bpm: number, maxHR = 190): number {
+  const p = bpm / maxHR;
+  if (p < 0.6) return 1;
+  if (p < 0.7) return 2;
+  if (p < 0.8) return 3;
+  if (p < 0.9) return 4;
+  return 5;
+}
+
+/** Convert real HR stream → canvas points with zone-coloring metadata */
+function buildRealHRPath(
+  hrPts: { t: number; bpm: number }[],
+  centerY: number,
+  amplitude: number,
+  maxHR: number
+): { pts: { x: number; y: number }[]; colors: string[] } {
+  if (hrPts.length < 2) return { pts: [], colors: [] };
+  const minBpm = Math.min(...hrPts.map((p) => p.bpm));
+  const maxBpm = Math.max(...hrPts.map((p) => p.bpm));
+  const range = maxBpm - minBpm || 1;
+  const maxT = hrPts[hrPts.length - 1].t || 1;
+  const pts = hrPts.map((p) => ({
+    x: (p.t / maxT) * CW,
+    y: centerY + ((maxBpm - p.bpm) / range) * amplitude * 2 - amplitude,
+  }));
+  const colors = hrPts.slice(1).map((p, i) => {
+    const midBpm = (hrPts[i].bpm + p.bpm) / 2;
+    return ZONE_COLORS_ECG[zoneForBpmECG(midBpm, maxHR)];
+  });
+  return { pts, colors };
+}
+
 export function AnimatedECGCard({
   canvasRef, name, type, startTime, duration, distance,
-  avgHeartRate, maxHeartRate, avgPace, calories, elevGain, steps,
+  avgHeartRate, maxHeartRate, minHeartRate, avgPace, calories, elevGain, steps,
   config = DEFAULT_CONFIG,
   animKey = 0,
   routePoints,
+  hrStream,
+  maxHR = 190,
 }: AnimatedECGCardProps) {
   const localRef = useRef<HTMLCanvasElement>(null);
   const ref = (canvasRef ?? localRef) as React.RefObject<HTMLCanvasElement>;
@@ -110,7 +151,24 @@ export function AnimatedECGCard({
 
     const ECG_CENTER_Y = 255 * s;  // 40% of 640 logical
     const AMPLITUDE    = 72 * s;
-    const pathPts = buildPath(ECG_CENTER_Y, AMPLITUDE);
+
+    // Real HR stream takes priority over synthetic beat
+    let realHRPts: { x: number; y: number }[] = [];
+    let realHRColors: string[] = [];
+    let useRealHR = false;
+    try {
+      if (hrStream) {
+        const parsed: { t: number; bpm: number }[] = JSON.parse(hrStream);
+        if (parsed.length >= 4) {
+          const { pts, colors } = buildRealHRPath(parsed, ECG_CENTER_Y, AMPLITUDE, maxHR);
+          realHRPts  = pts;
+          realHRColors = colors;
+          useRealHR  = pts.length > 1;
+        }
+      }
+    } catch { /* fall back to synthetic */ }
+
+    const pathPts = useRealHR ? realHRPts : buildPath(ECG_CENTER_Y, AMPLITUDE);
 
     const typeLabel = getActivityTypeLabel(type).toUpperCase();
     const titleLabel = config.titleMode === "name" && name ? name.toUpperCase() : typeLabel;
@@ -208,32 +266,52 @@ export function AnimatedECGCard({
         ctx.lineJoin = "round";
         ctx.lineCap  = "round";
 
-        // Outer glow
-        ctx.beginPath();
-        pts.forEach(({ x, y }, i) => (i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
-        ctx.strokeStyle = "rgba(200,255,0,0.08)";
-        ctx.lineWidth = 22 * s;
-        ctx.stroke();
+        if (useRealHR) {
+          // ── Real HR: draw per-segment zone colours ────────────────────
+          // Glow pass (single path)
+          ctx.beginPath();
+          pts.forEach(({ x, y }, i) => (i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
+          ctx.strokeStyle = "rgba(200,255,0,0.06)";
+          ctx.lineWidth = 18 * s;
+          ctx.stroke();
 
-        // Inner glow
-        ctx.beginPath();
-        pts.forEach(({ x, y }, i) => (i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
-        ctx.strokeStyle = "rgba(200,255,0,0.20)";
-        ctx.lineWidth = 9 * s;
-        ctx.stroke();
+          // Coloured segments
+          for (let i = 1; i < pts.length; i++) {
+            const color = realHRColors[i - 1] ?? "#c8ff00";
+            ctx.beginPath();
+            ctx.moveTo(pts[i - 1].x, pts[i - 1].y);
+            ctx.lineTo(pts[i].x, pts[i].y);
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 3 * s;
+            ctx.stroke();
+          }
+        } else {
+          // ── Synthetic beat: original glow + single colour ─────────────
+          ctx.beginPath();
+          pts.forEach(({ x, y }, i) => (i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
+          ctx.strokeStyle = "rgba(200,255,0,0.08)";
+          ctx.lineWidth = 22 * s;
+          ctx.stroke();
 
-        // Main line
-        ctx.beginPath();
-        pts.forEach(({ x, y }, i) => (i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
-        ctx.strokeStyle = "#c8ff00";
-        ctx.lineWidth = 2.5 * s;
-        ctx.stroke();
+          ctx.beginPath();
+          pts.forEach(({ x, y }, i) => (i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
+          ctx.strokeStyle = "rgba(200,255,0,0.20)";
+          ctx.lineWidth = 9 * s;
+          ctx.stroke();
 
-        // Glowing head
+          ctx.beginPath();
+          pts.forEach(({ x, y }, i) => (i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
+          ctx.strokeStyle = "#c8ff00";
+          ctx.lineWidth = 2.5 * s;
+          ctx.stroke();
+        }
+
+        // Glowing head (shared)
         if (ecgP < 1) {
           const head = pts[pts.length - 1];
+          const headColor = useRealHR ? (realHRColors[pts.length - 2] ?? "#c8ff00") : "#c8ff00";
           ctx.shadowBlur  = 22 * s;
-          ctx.shadowColor = "#c8ff00";
+          ctx.shadowColor = headColor;
           ctx.fillStyle   = "#ffffff";
           ctx.beginPath();
           ctx.arc(head.x, head.y, 5 * s, 0, Math.PI * 2);
@@ -321,7 +399,7 @@ export function AnimatedECGCard({
 
     raf = requestAnimationFrame(draw);
     return () => cancelAnimationFrame(raf);
-  }, [animKey, name, type, startTime, duration, distance, avgPace, avgHeartRate, maxHeartRate, calories, elevGain, steps, config, routePoints]);
+  }, [animKey, name, type, startTime, duration, distance, avgPace, avgHeartRate, maxHeartRate, minHeartRate, calories, elevGain, steps, config, routePoints, hrStream, maxHR]);
 
   return (
     <canvas

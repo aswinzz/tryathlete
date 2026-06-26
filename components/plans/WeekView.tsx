@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, ArrowLeft, Plus, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, ArrowLeft, Plus, Trash2, Loader2 } from "lucide-react";
 import type { WorkoutPlan, WorkoutWeek, WorkoutDay, WorkoutEntry } from "@prisma/client";
 import { ConfirmSheet } from "./ConfirmSheet";
 
@@ -46,7 +46,7 @@ export function WeekView({ plan: initialPlan, currentWeekNumber }: { plan: PlanF
   const router = useRouter();
   const [plan, setPlan] = useState(initialPlan);
   const [weekNum, setWeekNum] = useState(currentWeekNumber);
-  const [creatingDay, setCreatingDay] = useState<number | null>(null);
+  const [activeDay, setActiveDay] = useState<number | null>(null); // covers both create + navigate
   const [addingWeek, setAddingWeek] = useState(false);
   const [confirmDeleteWeek, setConfirmDeleteWeek] = useState(false);
   const [deletingWeek, setDeletingWeek] = useState(false);
@@ -99,13 +99,14 @@ export function WeekView({ plan: initialPlan, currentWeekNumber }: { plan: PlanF
   }
 
   async function openOrCreateDay(dow: number) {
-    if (!week) return;
+    if (!week || activeDay !== null) return;
+    setActiveDay(dow);
     const existing = week.days.find((d) => d.dayOfWeek === dow);
     if (existing) {
       router.push(`/plans/${plan.id}/day/${week.weekNumber}/${dow}`);
+      // leave activeDay set — we're navigating away
       return;
     }
-    setCreatingDay(dow);
     const res = await fetch(
       `/api/plans/${plan.id}/weeks/${week.id}/days`,
       {
@@ -116,8 +117,9 @@ export function WeekView({ plan: initialPlan, currentWeekNumber }: { plan: PlanF
     );
     if (res.ok) {
       router.push(`/plans/${plan.id}/day/${week.weekNumber}/${dow}`);
+    } else {
+      setActiveDay(null);
     }
-    setCreatingDay(null);
   }
 
   return (
@@ -177,7 +179,7 @@ export function WeekView({ plan: initialPlan, currentWeekNumber }: { plan: PlanF
           </button>
         </div>
 
-        {/* 7-day mini strip — always shown when a week exists */}
+        {/* 7-day mini strip */}
         {week && (
           <div className="flex gap-1 justify-between">
             {Array.from({ length: 7 }, (_, i) => i + 1).map((dow) => {
@@ -186,11 +188,13 @@ export function WeekView({ plan: initialPlan, currentWeekNumber }: { plan: PlanF
               const isRest = day?.type === "REST";
               const isDone = day?.status === "COMPLETED";
               const today = day ? isToday(day, plan, week) : false;
+              const isActive = activeDay === dow;
               return (
                 <button
                   key={dow}
                   onClick={() => openOrCreateDay(dow)}
-                  className="flex-1 flex flex-col items-center gap-1 py-2 rounded-xl text-xs"
+                  disabled={activeDay !== null}
+                  className="flex-1 flex flex-col items-center gap-1 py-2 rounded-xl text-xs transition-opacity disabled:opacity-60"
                   style={{
                     background: today ? "rgba(204,255,0,0.1)" : isRace ? "rgba(255,215,0,0.1)" : "var(--surface-1)",
                     border: today ? "1px solid var(--accent)" : "1px solid transparent",
@@ -200,7 +204,9 @@ export function WeekView({ plan: initialPlan, currentWeekNumber }: { plan: PlanF
                     {DAY_LABELS_SHORT[dow - 1]}
                   </span>
                   <span style={{ fontSize: 14 }}>
-                    {isRace ? "🏆" : isRest ? "😴" : isDone ? "✅" : day ? "⚡" : "·"}
+                    {isActive
+                      ? <Loader2 size={14} className="animate-spin text-[var(--accent)]" />
+                      : isRace ? "🏆" : isRest ? "😴" : isDone ? "✅" : day ? "⚡" : "·"}
                   </span>
                 </button>
               );
@@ -221,7 +227,7 @@ export function WeekView({ plan: initialPlan, currentWeekNumber }: { plan: PlanF
             className="flex items-center gap-2 px-5 py-3 rounded-xl font-bold text-sm disabled:opacity-50"
             style={{ background: "var(--accent)", color: "#000" }}
           >
-            <Plus size={15} strokeWidth={2.5} />
+            {addingWeek ? <Loader2 size={15} className="animate-spin" /> : <Plus size={15} strokeWidth={2.5} />}
             {addingWeek ? "Adding…" : "Add Week 1"}
           </button>
         </div>
@@ -236,17 +242,17 @@ export function WeekView({ plan: initialPlan, currentWeekNumber }: { plan: PlanF
             const isRace = day?.type === "RACE";
             const isRest = day?.type === "REST";
             const isDone = day?.status === "COMPLETED";
-            const isCreating = creatingDay === dow;
+            const isActive = activeDay === dow;
             const isEmpty = !day;
 
             return (
               <button
                 key={dow}
                 onClick={() => openOrCreateDay(dow)}
-                disabled={isCreating}
-                className="w-full text-left p-4 rounded-2xl space-y-2 transition-opacity disabled:opacity-50"
+                disabled={activeDay !== null}
+                className="w-full text-left p-4 rounded-2xl space-y-2 transition-opacity disabled:opacity-60"
                 style={{
-                  background: isRace ? "rgba(255,215,0,0.07)" : isEmpty ? "var(--surface-1)" : "var(--surface-1)",
+                  background: isRace ? "rgba(255,215,0,0.07)" : "var(--surface-1)",
                   border: today
                     ? "1px solid var(--accent)"
                     : isRace
@@ -254,7 +260,7 @@ export function WeekView({ plan: initialPlan, currentWeekNumber }: { plan: PlanF
                     : isEmpty
                     ? "1px dashed var(--border)"
                     : "1px solid transparent",
-                  opacity: isEmpty ? 0.6 : 1,
+                  opacity: isEmpty && activeDay === null ? 0.6 : undefined,
                 }}
               >
                 <div className="flex items-center justify-between">
@@ -287,10 +293,12 @@ export function WeekView({ plan: initialPlan, currentWeekNumber }: { plan: PlanF
                   </div>
 
                   <div className="flex items-center gap-2">
-                    {isDone && <span className="text-xs text-[var(--accent)]">✓ Done</span>}
-                    {isEmpty ? (
+                    {isDone && !isActive && <span className="text-xs text-[var(--accent)]">✓ Done</span>}
+                    {isActive ? (
+                      <Loader2 size={14} className="animate-spin text-[var(--accent)]" />
+                    ) : isEmpty ? (
                       <span className="flex items-center gap-1 text-xs text-[var(--text-3)]">
-                        {isCreating ? "Adding…" : <><Plus size={12} /> Add</>}
+                        <Plus size={12} /> Add
                       </span>
                     ) : (
                       <ChevronRight size={14} className="text-[var(--text-3)]" />
@@ -342,7 +350,9 @@ export function WeekView({ plan: initialPlan, currentWeekNumber }: { plan: PlanF
               color: "var(--text-2)",
             }}
           >
-            <Plus size={15} />
+            {addingWeek
+              ? <Loader2 size={15} className="animate-spin" />
+              : <Plus size={15} />}
             {addingWeek ? "Adding…" : `Add Week ${totalWeeks + 1}`}
           </button>
         </div>

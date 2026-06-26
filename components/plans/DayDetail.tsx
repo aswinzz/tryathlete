@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Plus, Check, Trash2, Link2, X, RefreshCw } from "lucide-react";
+import { ArrowLeft, Plus, Check, Trash2, Link2, X, RefreshCw, Loader2 } from "lucide-react";
 import type { WorkoutWeek, WorkoutDay, WorkoutEntry } from "@prisma/client";
 import { AddEntrySheet } from "./AddEntrySheet";
 import { ConfirmSheet } from "./ConfirmSheet";
@@ -75,6 +75,9 @@ export function DayDetail({ planId, planTitle, week, day: initialDay }: Props) {
   const [checkingMatches, setCheckingMatches] = useState(false);
   const [matchResult, setMatchResult] = useState<{ linked: number; suggested: number } | null>(null);
   const [pickerEntry, setPickerEntry] = useState<EntryWithLinks | null>(null);
+  const [deletingEntryId, setDeletingEntryId] = useState<string | null>(null);
+  const [confirmingLinkId, setConfirmingLinkId] = useState<string | null>(null);
+  const [unlinkingLinkId, setUnlinkingLinkId] = useState<string | null>(null);
 
   const isRace = day.type === "RACE";
   const isRest = day.type === "REST";
@@ -105,8 +108,10 @@ export function DayDetail({ planId, planTitle, week, day: initialDay }: Props) {
   }
 
   async function deleteEntry(entryId: string) {
+    setDeletingEntryId(entryId);
     await fetch(`/api/plans/${planId}/weeks/${week.id}/days/${day.id}/entries/${entryId}`, { method: "DELETE" });
     setDay((d) => ({ ...d, entries: d.entries.filter((e) => e.id !== entryId) }));
+    setDeletingEntryId(null);
   }
 
   async function checkMatches() {
@@ -131,6 +136,7 @@ export function DayDetail({ planId, planTitle, week, day: initialDay }: Props) {
   }
 
   async function unlinkActivity(entryId: string, linkId: string) {
+    setUnlinkingLinkId(linkId);
     await fetch(`/api/plans/entries/${entryId}/links/${linkId}`, { method: "DELETE" });
     setDay((d) => ({
       ...d,
@@ -138,9 +144,11 @@ export function DayDetail({ planId, planTitle, week, day: initialDay }: Props) {
         e.id === entryId ? { ...e, links: e.links.filter((l) => l.id !== linkId) } : e
       ),
     }));
+    setUnlinkingLinkId(null);
   }
 
   async function confirmSuggestedLink(entryId: string, linkId: string) {
+    setConfirmingLinkId(linkId);
     const res = await fetch(`/api/plans/entries/${entryId}/links/${linkId}`, { method: "PATCH" });
     if (res.ok) {
       setDay((d) => ({
@@ -152,6 +160,7 @@ export function DayDetail({ planId, planTitle, week, day: initialDay }: Props) {
         ),
       }));
     }
+    setConfirmingLinkId(null);
   }
 
   function onEntryAdded(entry: WorkoutEntry) {
@@ -304,6 +313,9 @@ export function DayDetail({ planId, planTitle, week, day: initialDay }: Props) {
                     key={entry.id}
                     entry={entry}
                     isRace={isRace}
+                    isDeleting={deletingEntryId === entry.id}
+                    confirmingLinkId={confirmingLinkId}
+                    unlinkingLinkId={unlinkingLinkId}
                     onDelete={() => deleteEntry(entry.id)}
                     onLinkActivity={() => setPickerEntry(entry)}
                     onUnlink={(linkId) => unlinkActivity(entry.id, linkId)}
@@ -356,7 +368,7 @@ export function DayDetail({ planId, planTitle, week, day: initialDay }: Props) {
           entryId={pickerEntry.id}
           entryTitle={pickerEntry.title}
           onClose={() => setPickerEntry(null)}
-          onLinked={(link) => onActivityLinked(pickerEntry.id, link as ActivityLink)}
+          onLinked={(link) => onActivityLinked(pickerEntry.id, { ...link, confidence: 1, status: "MANUAL" as const })}
         />
       )}
     </div>
@@ -368,13 +380,16 @@ export function DayDetail({ planId, planTitle, week, day: initialDay }: Props) {
 interface EntryCardProps {
   entry: EntryWithLinks;
   isRace: boolean;
+  isDeleting: boolean;
+  confirmingLinkId: string | null;
+  unlinkingLinkId: string | null;
   onDelete: () => void;
   onLinkActivity: () => void;
   onUnlink: (linkId: string) => void;
   onConfirmSuggested: (linkId: string) => void;
 }
 
-function EntryCard({ entry, isRace, onDelete, onLinkActivity, onUnlink, onConfirmSuggested }: EntryCardProps) {
+function EntryCard({ entry, isRace, isDeleting, confirmingLinkId, unlinkingLinkId, onDelete, onLinkActivity, onUnlink, onConfirmSuggested }: EntryCardProps) {
   const activeLinks = entry.links.filter((l) => l.status !== "REJECTED");
   const confirmedLinks = activeLinks.filter((l) => l.status === "AUTO" || l.status === "MANUAL");
   const suggestedLinks = activeLinks.filter((l) => l.status === "SUGGESTED");
@@ -382,8 +397,12 @@ function EntryCard({ entry, isRace, onDelete, onLinkActivity, onUnlink, onConfir
 
   return (
     <div
-      className="p-4 rounded-2xl space-y-3"
-      style={{ background: "var(--surface-1)", borderLeft: `3px solid ${accentColor}` }}
+      className="p-4 rounded-2xl space-y-3 transition-opacity"
+      style={{
+        background: "var(--surface-1)",
+        borderLeft: `3px solid ${accentColor}`,
+        opacity: isDeleting ? 0.4 : 1,
+      }}
     >
       {/* Entry header */}
       <div className="flex items-start gap-3">
@@ -392,13 +411,15 @@ function EntryCard({ entry, isRace, onDelete, onLinkActivity, onUnlink, onConfir
           <div className="flex items-center justify-between">
             <p className="font-semibold text-sm text-white truncate">{entry.title}</p>
             <div className="flex items-center gap-2 ml-2 shrink-0">
-              <button onClick={onLinkActivity} title="Link activity"
-                className="text-[var(--text-3)] hover:text-[var(--accent)] transition-colors">
+              <button onClick={onLinkActivity} disabled={isDeleting} title="Link activity"
+                className="text-[var(--text-3)] hover:text-[var(--accent)] transition-colors disabled:pointer-events-none">
                 <Link2 size={13} />
               </button>
-              <button onClick={onDelete}
-                className="text-[var(--text-3)] hover:text-red-400 transition-colors">
-                <Trash2 size={13} />
+              <button onClick={onDelete} disabled={isDeleting}
+                className="text-[var(--text-3)] hover:text-red-400 transition-colors disabled:pointer-events-none">
+                {isDeleting
+                  ? <Loader2 size={13} className="animate-spin" />
+                  : <Trash2 size={13} />}
               </button>
             </div>
           </div>
@@ -422,6 +443,7 @@ function EntryCard({ entry, isRace, onDelete, onLinkActivity, onUnlink, onConfir
               key={link.id}
               link={link}
               entry={entry}
+              isUnlinking={unlinkingLinkId === link.id}
               onUnlink={() => onUnlink(link.id)}
             />
           ))}
@@ -434,33 +456,49 @@ function EntryCard({ entry, isRace, onDelete, onLinkActivity, onUnlink, onConfir
           <p className="text-[10px] font-bold tracking-wider" style={{ color: "#ff9500" }}>
             SUGGESTED MATCH
           </p>
-          {suggestedLinks.map((link) => (
-            <div key={link.id}
-              className="flex items-center gap-2 px-3 py-2 rounded-xl"
-              style={{ background: "rgba(255,149,0,0.08)", border: "1px solid rgba(255,149,0,0.2)" }}>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-white truncate">{link.activity.name}</p>
-                <p className="text-[10px] text-[var(--text-3)]">
-                  {link.activity.distance ? formatDistanceKm(link.activity.distance) : ""}
-                  {link.activity.duration ? ` · ${formatDurationShort(link.activity.duration)}` : ""}
-                  {" · "}{Math.round(link.confidence * 100)}% match
-                </p>
+          {suggestedLinks.map((link) => {
+            const isConfirming = confirmingLinkId === link.id;
+            const isUnlinking = unlinkingLinkId === link.id;
+            const isBusy = isConfirming || isUnlinking;
+            return (
+              <div key={link.id}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl transition-opacity"
+                style={{
+                  background: "rgba(255,149,0,0.08)",
+                  border: "1px solid rgba(255,149,0,0.2)",
+                  opacity: isBusy ? 0.6 : 1,
+                }}>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-semibold text-white truncate">{link.activity.name}</p>
+                  <p className="text-[10px] text-[var(--text-3)]">
+                    {link.activity.distance ? formatDistanceKm(link.activity.distance) : ""}
+                    {link.activity.duration ? ` · ${formatDurationShort(link.activity.duration)}` : ""}
+                    {" · "}{Math.round(link.confidence * 100)}% match
+                  </p>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => onConfirmSuggested(link.id)}
+                    disabled={isBusy}
+                    className="px-2 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1 disabled:pointer-events-none"
+                    style={{ background: "rgba(255,149,0,0.2)", color: "#ff9500" }}
+                  >
+                    {isConfirming && <Loader2 size={9} className="animate-spin" />}
+                    {isConfirming ? "Saving…" : "Confirm"}
+                  </button>
+                  <button
+                    onClick={() => onUnlink(link.id)}
+                    disabled={isBusy}
+                    className="text-[var(--text-3)] hover:text-red-400 transition-colors ml-1 disabled:pointer-events-none"
+                  >
+                    {isUnlinking
+                      ? <Loader2 size={12} className="animate-spin" />
+                      : <X size={12} />}
+                  </button>
+                </div>
               </div>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => onConfirmSuggested(link.id)}
-                  className="px-2 py-1 rounded-lg text-[10px] font-bold"
-                  style={{ background: "rgba(255,149,0,0.2)", color: "#ff9500" }}
-                >
-                  Confirm
-                </button>
-                <button onClick={() => onUnlink(link.id)}
-                  className="text-[var(--text-3)] hover:text-red-400 transition-colors ml-1">
-                  <X size={12} />
-                </button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
@@ -469,9 +507,10 @@ function EntryCard({ entry, isRace, onDelete, onLinkActivity, onUnlink, onConfir
 
 // ─── Activity chip (confirmed link) ──────────────────────────────────────────
 
-function ActivityChip({ link, entry, onUnlink }: {
+function ActivityChip({ link, entry, isUnlinking, onUnlink }: {
   link: ActivityLink;
   entry: EntryWithLinks;
+  isUnlinking: boolean;
   onUnlink: () => void;
 }) {
   const act = link.activity;
@@ -486,8 +525,8 @@ function ActivityChip({ link, entry, onUnlink }: {
     : null;
 
   return (
-    <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl"
-      style={{ background: "rgba(204,255,0,0.06)", border: "1px solid rgba(204,255,0,0.15)" }}>
+    <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl transition-opacity"
+      style={{ background: "rgba(204,255,0,0.06)", border: "1px solid rgba(204,255,0,0.15)", opacity: isUnlinking ? 0.4 : 1 }}>
       <Check size={12} strokeWidth={3} className="text-[var(--accent)] shrink-0" />
       <div className="flex-1 min-w-0">
         <p className="text-xs font-semibold text-white truncate">{act.name}</p>
@@ -523,8 +562,9 @@ function ActivityChip({ link, entry, onUnlink }: {
           )}
         </div>
       </div>
-      <button onClick={onUnlink} className="text-[var(--text-3)] hover:text-red-400 transition-colors ml-1 shrink-0">
-        <X size={13} />
+      <button onClick={onUnlink} disabled={isUnlinking}
+        className="text-[var(--text-3)] hover:text-red-400 transition-colors ml-1 shrink-0 disabled:pointer-events-none">
+        {isUnlinking ? <Loader2 size={13} className="animate-spin" /> : <X size={13} />}
       </button>
     </div>
   );

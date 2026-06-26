@@ -18,6 +18,7 @@ import { AnimatedFlipCard, ANIM_FLIP_DURATION } from "@/components/cards/animate
 import { AnimatedTerminalCard, ANIM_TERMINAL_DURATION } from "@/components/cards/animated/AnimatedTerminalCard";
 import { AnimatedRouteCard, ANIM_ROUTE_DURATION } from "@/components/cards/animated/AnimatedRouteCard";
 import { RouteCard } from "@/components/cards/RouteCard";
+import { HRZoneCard } from "@/components/cards/HRZoneCard";
 import type { RoutePoint } from "@/lib/routeUtils";
 import { Button } from "@/components/ui/Button";
 import { Download, Share2, ArrowLeft } from "lucide-react";
@@ -41,12 +42,15 @@ interface Activity {
   distance: number | null;
   avgHeartRate: number | null;
   maxHeartRate: number | null;
+  minHeartRate: number | null;
   avgPace: number | null;
   bestPace: number | null;
   calories: number | null;
   elevGain: number | null;
   steps: number | null;
   routePoints: string | null;
+  hrStream: string | null;
+  hrZones: string | null;
   laps: {
     lapIndex: number;
     distance: number;
@@ -58,10 +62,11 @@ interface Activity {
 }
 
 type Format =
-  | "receipt" | "dark" | "neon" | "night" | "story" | "retro" | "minimal" | "route"
+  | "receipt" | "dark" | "neon" | "night" | "story" | "retro" | "minimal" | "route" | "hr-zone"
   | "overlay-clean" | "overlay-bar" | "overlay-bold" | "overlay-pills"
   | "receipt-anim" | "anim-count" | "anim-ecg" | "anim-flip" | "anim-terminal" | "anim-route"
-  | "dark-glass" | "neon-glass" | "night-glass" | "story-glass" | "retro-glass" | "minimal-glass";
+  | "dark-glass" | "neon-glass" | "night-glass" | "story-glass" | "retro-glass" | "minimal-glass"
+  | "hr-zone-glass";
 
 interface FormatDef {
   id: Format;
@@ -83,6 +88,7 @@ const FORMATS: FormatDef[] = [
   { id: "retro",        label: "Retro",     hint: "Newspaper column style",         bg: "#F2EDE4", swatchBg: "#F2EDE4", swatchText: "#1a1a1a",                 group: "Cards" },
   { id: "minimal",      label: "Minimal",   hint: "Clean white, modern",            bg: "#ffffff", swatchBg: "#ffffff", swatchText: "#0a0a0a",                 group: "Cards" },
   { id: "route",        label: "Route",     hint: "GPS route map with stats",       bg: "#060911", swatchBg: "#060911", swatchText: "#c8ff00",                 group: "Cards" },
+  { id: "hr-zone",     label: "HR Zones",  hint: "Heart rate curve + zone breakdown", bg: "#04090a", swatchBg: "#04090a", swatchText: "#FF6B9D",                group: "Cards" },
   // — Animated (saves as video) —
   { id: "receipt-anim", label: "Receipt",   hint: "Printer animation · saves as video", bg: "#FAFAF8", swatchBg: "#FAFAF8", swatchText: "#c8ff00",            group: "Animated" },
   { id: "anim-count",   label: "Odometer",  hint: "Stats count up from zero",           bg: "#0a0a0a", swatchBg: "#0a0a0a", swatchText: "#c8ff00",            group: "Animated" },
@@ -102,6 +108,7 @@ const FORMATS: FormatDef[] = [
   { id: "story-glass",   label: "Story",    hint: "Story theme · transparent", bg: null, swatchBg: "#0a0a0a", swatchText: "#c8ff00",               group: "Glass" },
   { id: "retro-glass",   label: "Retro",    hint: "Retro theme · transparent", bg: null, swatchBg: "#F2EDE4", swatchText: "#1a1a1a",               group: "Glass" },
   { id: "minimal-glass", label: "Minimal",  hint: "Minimal theme · transparent", bg: null, swatchBg: "#ffffff", swatchText: "#0a0a0a",             group: "Glass" },
+  { id: "hr-zone-glass", label: "HR Zones", hint: "HR zones card · transparent", bg: null, swatchBg: "#04090a", swatchText: "#FF6B9D",              group: "Glass" },
 ];
 
 export default function SharePage() {
@@ -579,6 +586,7 @@ export default function SharePage() {
     distance: activity.distance,
     avgHeartRate: activity.avgHeartRate,
     maxHeartRate: activity.maxHeartRate,
+    minHeartRate: activity.minHeartRate,
     avgPace: activity.avgPace,
     bestPace: activity.bestPace,
     calories: activity.calories,
@@ -586,6 +594,20 @@ export default function SharePage() {
     steps: activity.steps,
     laps: activity.laps,
     routePoints: parsedRoutePoints,
+    hrStream: activity.hrStream,
+    hrZones: activity.hrZones,
+  };
+
+  const hrCardProps = {
+    name: activity.name,
+    type: activity.type,
+    startTime: new Date(activity.startTime),
+    duration: activity.duration,
+    avgHeartRate: activity.avgHeartRate,
+    maxHeartRate: activity.maxHeartRate,
+    minHeartRate: activity.minHeartRate,
+    hrStream: activity.hrStream,
+    hrZones: activity.hrZones,
   };
 
   return (
@@ -818,10 +840,11 @@ export default function SharePage() {
             {format === "retro"   && <RetroCard   cardRef={cardRef} config={config} {...sharedProps} />}
             {format === "minimal" && <MinimalCard cardRef={cardRef} config={config} {...sharedProps} />}
             {format === "route"   && <RouteCard   cardRef={cardRef} config={config} {...sharedProps} />}
+            {format === "hr-zone" && <HRZoneCard  cardRef={cardRef} {...hrCardProps} />}
 
             {/* Overlay + Glass variants — checkerboard is preview-only (excluded from PNG export) */}
             {(format === "overlay-clean" || format === "overlay-bar" || format === "overlay-bold" || format === "overlay-pills" ||
-              format === "dark-glass" || format === "neon-glass" || format === "night-glass" || format === "story-glass" || format === "retro-glass" || format === "minimal-glass") && (
+              format === "dark-glass" || format === "neon-glass" || format === "night-glass" || format === "story-glass" || format === "retro-glass" || format === "minimal-glass" || format === "hr-zone-glass") && (
               <>
                 <div
                   className="preview-only"
@@ -844,6 +867,7 @@ export default function SharePage() {
                   {format === "story-glass"    && <StoryCard   glass cardRef={cardRef} config={config} {...sharedProps} />}
                   {format === "retro-glass"    && <RetroCard   glass cardRef={cardRef} config={config} {...sharedProps} />}
                   {format === "minimal-glass"  && <MinimalCard glass cardRef={cardRef} config={config} {...sharedProps} />}
+                  {format === "hr-zone-glass"  && <HRZoneCard  glass cardRef={cardRef} {...hrCardProps} />}
                 </div>
               </>
             )}

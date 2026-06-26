@@ -97,6 +97,9 @@ model Activity {
   steps       Int?
   rawData     String?  // JSON blob of full Garmin response
   routePoints String?  // JSON array of {lat, lon} — downsampled GPS polyline
+  minHeartRate Int?
+  hrStream    String?  // JSON [{t: secs_offset, bpm: number}, ...] downsampled ~10s intervals
+  hrZones     String?  // JSON {z1: secs, z2: secs, z3: secs, z4: secs, z5: secs}
   createdAt   DateTime @default(now())
 
   user  User               @relation(fields: [userId], references: [id], onDelete: Cascade)

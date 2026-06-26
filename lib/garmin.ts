@@ -47,6 +47,17 @@ interface GarminSplitsResponse {
   lapDTOs?: GarminSplit[];
 }
 
+/**
+ * The /details endpoint returns time-series data in a column-oriented format:
+ *   metricDescriptors — maps column index → metric key (e.g. "directHeartRate")
+ *   activityDetailMetrics — array of rows, each with a startTimeGMT and a metrics array
+ */
+export interface GarminDetailsResponse {
+  geoPolylineDTO?: { polyline?: { lat: number; lon: number }[] };
+  metricDescriptors?: { metricsIndex: number; key: string }[];
+  activityDetailMetrics?: { startTimeGMT?: string; metrics: (number | null)[] }[];
+}
+
 export async function syncGarminActivities(userId: string) {
   const client = await getGarminClient(userId);
 
@@ -134,21 +145,38 @@ export async function syncGarminActivities(userId: string) {
       // Lap/split data not always available — skip silently
     }
 
-    // Fetch GPS route polyline
+    // GPS route — plain /details, no extra params (stable response shape).
+    // Write only routePoints here; HR is handled in the dedicated block below.
     try {
       const detailsUrl = `https://connectapi.garmin.com/activity-service/activity/${act.activityId}/details`;
-      const details = await client.get<{ geoPolylineDTO?: { polyline?: { lat: number; lon: number }[] } }>(detailsUrl);
-      const polyline = details?.geoPolylineDTO?.polyline;
-      if (Array.isArray(polyline) && polyline.length > 1) {
-        const pts = polyline.map((p) => ({ lat: p.lat, lon: p.lon }));
-        const downsampled = downsample(pts, 200);
+      const details = await client.get<GarminDetailsResponse>(detailsUrl);
+      const updateData = extractDetailsData(details, saved.startTime);
+      if (updateData.routePoints) {
         await prisma.activity.update({
           where: { id: saved.id },
-          data: { routePoints: JSON.stringify(downsampled) },
+          data: { routePoints: updateData.routePoints as string },
         });
       }
     } catch {
-      // GPS not always available (e.g. indoor activities) — skip silently
+      // GPS not always available (indoor / strength) — skip silently
+    }
+
+    // HR time series — separate call with maxChartSize for denser metric data.
+    // Isolated because maxChartSize can change the response shape.
+    try {
+      const hrUrl = `https://connectapi.garmin.com/activity-service/activity/${act.activityId}/details?maxChartSize=2000`;
+      const hrDetails = await client.get<GarminDetailsResponse>(hrUrl);
+      const hrData = extractDetailsData(hrDetails, saved.startTime);
+      const hrUpdate: Record<string, unknown> = {};
+      if (hrData.hrStream)     hrUpdate.hrStream     = hrData.hrStream;
+      if (hrData.hrZones)      hrUpdate.hrZones      = hrData.hrZones;
+      if (hrData.minHeartRate) hrUpdate.minHeartRate = hrData.minHeartRate;
+      if (Object.keys(hrUpdate).length > 0) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await (prisma.activity.update as any)({ where: { id: saved.id }, data: hrUpdate });
+      }
+    } catch {
+      // HR not always available — skip silently
     }
 
     // Reconcile against active workout plan (fire-and-forget, never throws)
@@ -199,3 +227,120 @@ export const ZONE_COLORS: Record<number, string> = {
   4: "#FF6B9D",
   5: "#FF4757",
 };
+
+// ─── Details extraction ───────────────────────────────────────────────────────
+
+/**
+ * Parse the Garmin details endpoint response into DB-ready fields.
+ * The details endpoint uses a column-oriented format:
+ *   metricDescriptors  — maps column index → metric key
+ *   activityDetailMetrics — rows of per-second measurements
+ *
+ * HR key: "directHeartRate"  (bpm)
+ * Time key: "directTimestamp" (not used; each row has startTimeGMT instead)
+ */
+export function extractDetailsData(
+  details: GarminDetailsResponse | null | undefined,
+  activityStartTime: Date
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (!details) return out;
+
+  // ── GPS polyline ──────────────────────────────────────────────────────────
+  const polyline = details.geoPolylineDTO?.polyline;
+  if (Array.isArray(polyline) && polyline.length > 1) {
+    const pts = polyline.map((p) => ({ lat: p.lat, lon: p.lon }));
+    out.routePoints = JSON.stringify(downsample(pts, 200));
+  }
+
+  // ── Heart rate time series ────────────────────────────────────────────────
+  const descriptors = details.metricDescriptors;
+  const rows = details.activityDetailMetrics;
+  if (!Array.isArray(descriptors) || !Array.isArray(rows) || rows.length === 0) return out;
+
+  const hrDesc = descriptors.find((d) => d.key === "directHeartRate");
+  if (!hrDesc) return out;
+
+  const hrIdx = hrDesc.metricsIndex;
+  const startMs = activityStartTime.getTime();
+
+  // Build {t, bpm} pairs from the rows
+  const hrPts: { t: number; bpm: number }[] = [];
+  for (const row of rows) {
+    const bpm = row.metrics[hrIdx];
+    if (!bpm || bpm <= 0) continue;
+    // startTimeGMT format: "2024-03-15 07:30:00" (no tz suffix — treat as UTC)
+    if (!row.startTimeGMT) continue;
+    const ptMs = new Date(row.startTimeGMT.replace(" ", "T") + "Z").getTime();
+    const t = Math.round((ptMs - startMs) / 1000);
+    if (t < 0) continue;
+    hrPts.push({ t, bpm: Math.round(bpm) });
+  }
+
+  if (hrPts.length >= 4) {
+    const { stream, zones, minHR } = buildHRData(hrPts);
+    if (stream.length > 0) {
+      out.hrStream  = JSON.stringify(stream);
+      out.hrZones   = JSON.stringify(zones);
+      if (minHR !== null) out.minHeartRate = minHR;
+    }
+  }
+
+  return out;
+}
+
+// ─── HR processing ────────────────────────────────────────────────────────────
+
+interface HRPoint { t: number; bpm: number }
+interface HRZones { z1: number; z2: number; z3: number; z4: number; z5: number }
+
+/**
+ * Downsample a pre-parsed HR point array and compute zone breakdown.
+ * Keeps one point per DOWNSAMPLE_INTERVAL seconds; accumulates zone time
+ * from the interval between consecutive samples.
+ */
+export function buildHRData(
+  pts: { t: number; bpm: number }[],
+  maxHR = 190
+): { stream: HRPoint[]; zones: HRZones; minHR: number | null } {
+  const DOWNSAMPLE_INTERVAL = 10;
+  const zones: HRZones = { z1: 0, z2: 0, z3: 0, z4: 0, z5: 0 };
+  const stream: HRPoint[] = [];
+  let minHR: number | null = null;
+  let lastKeptT = -Infinity;
+
+  // Ensure sorted by time
+  const sorted = [...pts].sort((a, b) => a.t - b.t);
+
+  for (let i = 0; i < sorted.length; i++) {
+    const { t, bpm } = sorted[i];
+
+    // Zone time: interval to next sample, capped at 60s
+    const nextT = sorted[i + 1]?.t ?? t + 1;
+    const intervalSecs = Math.min(nextT - t, 60);
+    const zone = getHRZone(bpm, maxHR);
+    zones[`z${zone}` as keyof HRZones] += intervalSecs;
+
+    if (minHR === null || bpm < minHR) minHR = bpm;
+
+    if (t - lastKeptT >= DOWNSAMPLE_INTERVAL) {
+      stream.push({ t, bpm });
+      lastKeptT = t;
+    }
+  }
+
+  return { stream, zones, minHR };
+}
+
+/** @deprecated use buildHRData — kept for any callers passing raw [timestamp_ms, bpm] pairs */
+export function processHRStream(
+  hrValues: [number, number | null][],
+  startMs: number,
+  maxHR = 190
+): { stream: HRPoint[]; zones: HRZones; minHR: number | null } {
+  const pts = hrValues
+    .filter(([, bpm]) => bpm !== null && bpm > 0)
+    .map(([tsMs, bpm]) => ({ t: Math.round((tsMs - startMs) / 1000), bpm: bpm! }))
+    .filter(({ t }) => t >= 0);
+  return buildHRData(pts, maxHR);
+}
