@@ -27,7 +27,25 @@ export default async function DayDetailPage({
 
   const day = await prisma.workoutDay.findFirst({
     where: { weekId: week.id, dayOfWeek: parseInt(dayOfWeek) },
-    include: { entries: { orderBy: { orderIndex: "asc" } } },
+    include: {
+      entries: {
+        orderBy: { orderIndex: "asc" },
+        include: {
+          links: {
+            where: { status: { not: "REJECTED" } },
+            include: {
+              activity: {
+                select: {
+                  id: true, name: true, type: true, startTime: true,
+                  distance: true, duration: true, avgPace: true,
+                  avgHeartRate: true, calories: true,
+                },
+              },
+            },
+          },
+        },
+      },
+    },
   });
   if (!day) notFound();
 

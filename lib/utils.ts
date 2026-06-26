@@ -25,6 +25,20 @@ export function formatDistance(meters: number): string {
   return (meters / 1000).toFixed(2);
 }
 
+export function formatDistanceKm(meters: number): string {
+  const km = meters / 1000;
+  return km >= 10 ? `${km.toFixed(1)} km` : `${km.toFixed(2)} km`;
+}
+
+export function formatDurationShort(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  if (h > 0) return `${h}h ${m}m`;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
+}
+
 export function getHRZone(bpm: number, maxHR = 190): number {
   const pct = bpm / maxHR;
   if (pct < 0.6) return 1;

@@ -24,6 +24,20 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
   const entries = await prisma.workoutEntry.findMany({
     where: { dayId },
     orderBy: { orderIndex: "asc" },
+    include: {
+      links: {
+        where: { status: { not: "REJECTED" } },
+        include: {
+          activity: {
+            select: {
+              id: true, name: true, type: true, startTime: true,
+              distance: true, duration: true, avgPace: true,
+              avgHeartRate: true, calories: true,
+            },
+          },
+        },
+      },
+    },
   });
   return NextResponse.json(entries);
 }

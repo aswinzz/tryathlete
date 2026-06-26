@@ -99,8 +99,9 @@ model Activity {
   routePoints String?  // JSON array of {lat, lon} — downsampled GPS polyline
   createdAt   DateTime @default(now())
 
-  user User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  laps ActivityLap[]
+  user  User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  laps  ActivityLap[]
+  links PlanActivityLink[]
 }
 
 // ─── Workout Plan ────────────────────────────────────────────────────────────
@@ -134,6 +135,13 @@ enum EntryType {
   STRENGTH
   HIIT
   OTHER
+}
+
+enum LinkStatus {
+  AUTO      // matched and linked automatically by reconciler
+  SUGGESTED // reconciler found a candidate, awaiting user confirmation
+  MANUAL    // user explicitly linked this activity
+  REJECTED  // user rejected a suggestion (never auto-link again)
 }
 
 model WorkoutPlan {
@@ -191,7 +199,22 @@ model WorkoutEntry {
   orderIndex  Int       @default(0)
   createdAt   DateTime  @default(now())
 
-  day WorkoutDay @relation(fields: [dayId], references: [id], onDelete: Cascade)
+  day   WorkoutDay         @relation(fields: [dayId], references: [id], onDelete: Cascade)
+  links PlanActivityLink[]
+}
+
+model PlanActivityLink {
+  id          String     @id @default(cuid())
+  entryId     String
+  activityId  String
+  confidence  Float      // 0.0–1.0 — scoring confidence from reconciler
+  status      LinkStatus @default(AUTO)
+  createdAt   DateTime   @default(now())
+
+  entry    WorkoutEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  activity Activity     @relation(fields: [activityId], references: [id], onDelete: Cascade)
+
+  @@unique([entryId, activityId])
 }
 
 // ─── Activity Laps ────────────────────────────────────────────────────────────

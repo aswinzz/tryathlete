@@ -1,6 +1,7 @@
 import { GarminConnect } from "garmin-connect";
 import { prisma } from "./prisma";
 import { downsample } from "./routeUtils";
+import { reconcileActivity } from "./planReconciler";
 
 /**
  * Parse a Garmin time string (e.g. "2024-03-15 07:30:00") as UTC.
@@ -149,6 +150,9 @@ export async function syncGarminActivities(userId: string) {
     } catch {
       // GPS not always available (e.g. indoor activities) — skip silently
     }
+
+    // Reconcile against active workout plan (fire-and-forget, never throws)
+    reconcileActivity(saved.id, userId).catch(() => {});
   }
 
   await prisma.trackerConnection.update({
