@@ -2,23 +2,60 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Smartphone, Wifi, WifiOff } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
+import {
+  parseDataPrefs,
+  DEFAULT_WHOOP_PREFS,
+  DEFAULT_GARMIN_PREFS,
+} from "@/lib/whoop";
+import { DeviceSettings } from "./DeviceSettings";
+import { WhoopToast } from "./WhoopToast";
 
 export const dynamic = "force-dynamic";
 
-export default async function SettingsPage() {
+export default async function SettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string>>;
+}) {
   const session = await auth();
   if (!session) redirect("/auth/signin");
 
   const userId = session!.user!.id!;
+  const sp = await searchParams;
+
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: { connections: true },
   });
-
   if (!user) return null;
 
   const garminConn = user.connections.find((c) => c.provider === "garmin");
+  const whoopConn  = user.connections.find((c) => c.provider === "whoop");
+
+  const garminPrefs = parseDataPrefs(garminConn?.dataPrefs, DEFAULT_GARMIN_PREFS as typeof DEFAULT_WHOOP_PREFS);
+  const whoopPrefs  = parseDataPrefs(whoopConn?.dataPrefs,  DEFAULT_WHOOP_PREFS);
+
+  const devices = [
+    {
+      provider:   "garmin",
+      label:      "Garmin",
+      color:      "#00B4D8",
+      icon:       "G",
+      connected:  !!garminConn,
+      lastSyncAt: garminConn?.lastSyncAt?.toISOString() ?? null,
+      prefs:      garminPrefs,
+    },
+    {
+      provider:   "whoop",
+      label:      "WHOOP",
+      color:      "#00C851",
+      icon:       "W",
+      connected:  !!whoopConn,
+      lastSyncAt: whoopConn?.lastSyncAt?.toISOString() ?? null,
+      prefs:      whoopPrefs,
+    },
+  ];
 
   return (
     <div className="flex flex-col min-h-dvh">
@@ -35,88 +72,24 @@ export default async function SettingsPage() {
         <div className="w-14" />
       </div>
 
+      {/* OAuth toast feedback */}
+      {sp.whoop === "connected" && <WhoopToast type="success" />}
+      {sp.whoop === "error"     && <WhoopToast type="error" />}
+
       <div className="flex-1 px-5 py-7 space-y-8">
-        {/* Profile details */}
+        {/* Profile */}
         <section>
           <p className="text-[10px] font-bold text-[var(--text-3)] uppercase tracking-widest mb-4">
             Profile
           </p>
           <div className="space-y-2">
-            <SettingsRow label="Name" value={user.name || "—"} />
+            <SettingsRow label="Name"  value={user.name  || "—"} />
             <SettingsRow label="Email" value={user.email} />
           </div>
         </section>
 
-        {/* Connected Devices */}
-        <section>
-          <p className="text-[10px] font-bold text-[var(--text-3)] uppercase tracking-widest mb-4">
-            Connected Devices
-          </p>
-          <div className="space-y-3">
-            {/* Garmin */}
-            <div className="bg-[var(--surface-2)] rounded-2xl p-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div
-                  className="w-11 h-11 rounded-full flex items-center justify-center"
-                  style={{
-                    background: garminConn ? "rgba(200,255,0,0.12)" : "var(--surface-3)",
-                  }}
-                >
-                  <Smartphone
-                    size={18}
-                    style={{ color: garminConn ? "var(--accent)" : "var(--text-3)" }}
-                  />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-white">Garmin</p>
-                  <p className="text-xs text-[var(--text-3)] mt-0.5">
-                    {garminConn ? "Connected · syncing automatically" : "Not connected"}
-                  </p>
-                </div>
-              </div>
-              {garminConn ? (
-                <span
-                  className="flex items-center gap-1 text-[11px] font-bold px-3 py-1.5 rounded-full"
-                  style={{
-                    background: "rgba(200,255,0,0.1)",
-                    color: "var(--accent)",
-                  }}
-                >
-                  <Wifi size={11} />
-                  Active
-                </span>
-              ) : (
-                <Link
-                  href="/connect"
-                  className="text-xs font-bold text-[var(--accent)] bg-[var(--surface-3)] px-3 py-1.5 rounded-full"
-                >
-                  Connect
-                </Link>
-              )}
-            </div>
-
-            {/* Other trackers — coming soon */}
-            {["Apple Watch", "COROS", "Whoop", "Strava"].map((tracker) => (
-              <div
-                key={tracker}
-                className="bg-[var(--surface-2)] rounded-2xl p-4 flex items-center justify-between opacity-40"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 rounded-full flex items-center justify-center bg-[var(--surface-3)]">
-                    <WifiOff size={18} className="text-[var(--text-3)]" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-white">{tracker}</p>
-                    <p className="text-xs text-[var(--text-3)] mt-0.5">Coming soon</p>
-                  </div>
-                </div>
-                <span className="text-[10px] font-bold text-[var(--text-3)] bg-[var(--surface-3)] px-3 py-1.5 rounded-full">
-                  Soon
-                </span>
-              </div>
-            ))}
-          </div>
-        </section>
+        {/* Device management (client component) */}
+        <DeviceSettings devices={devices} />
 
         {/* App info */}
         <section>

@@ -6,11 +6,11 @@ import { Button } from "@/components/ui/Button";
 import Link from "next/link";
 
 const TRACKERS = [
-  { id: "garmin", name: "Garmin", sub: "Connect + Garmin watches", color: "#00B4D8", available: true },
-  { id: "apple", name: "Apple Watch", sub: "HealthKit integration", color: "#9E9E9E", available: false },
-  { id: "coros", name: "COROS", sub: "COROS training hub", color: "#FF6B35", available: false },
-  { id: "whoop", name: "Whoop", sub: "Recovery + strain data", color: "#00C851", available: false },
-  { id: "strava", name: "Strava", sub: "Import from Strava", color: "#FC4C02", available: false },
+  { id: "garmin", name: "Garmin",      sub: "Garmin watches + Connect",  color: "#00B4D8", available: true,  oauth: false },
+  { id: "whoop",  name: "WHOOP",       sub: "Recovery, sleep & HRV",     color: "#00C851", available: true,  oauth: true  },
+  { id: "apple",  name: "Apple Watch", sub: "HealthKit integration",      color: "#9E9E9E", available: false, oauth: false },
+  { id: "coros",  name: "COROS",       sub: "COROS training hub",         color: "#FF6B35", available: false, oauth: false },
+  { id: "strava", name: "Strava",      sub: "Import from Strava",         color: "#FC4C02", available: false, oauth: false },
 ];
 
 export default function ConnectPage() {
@@ -99,6 +99,14 @@ export default function ConnectPage() {
                   >
                     CONNECTED
                   </span>
+                ) : tracker.available && tracker.oauth ? (
+                  <a
+                    href={`/api/${tracker.id}/auth`}
+                    className="text-[11px] font-bold px-3 py-1.5 rounded-full flex-shrink-0 transition-colors"
+                    style={{ background: "var(--surface-3)", color: "var(--text)" }}
+                  >
+                    CONNECT
+                  </a>
                 ) : (
                   <button
                     onClick={() => tracker.available && setShowForm(isFormOpen ? null : tracker.id)}
@@ -110,7 +118,7 @@ export default function ConnectPage() {
                       cursor: tracker.available ? "pointer" : "default",
                     }}
                   >
-                    CONNECT
+                    {tracker.available ? "CONNECT" : "SOON"}
                   </button>
                 )}
               </div>

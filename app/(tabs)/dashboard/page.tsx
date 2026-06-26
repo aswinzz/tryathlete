@@ -9,6 +9,7 @@ import { OverallStatsCard } from "@/components/dashboard/OverallStatsCard";
 import type { TypeTab, AllTypeStats, TypeStats } from "@/components/dashboard/OverallStatsCard";
 import Link from "next/link";
 import { getHRZone } from "@/lib/utils";
+import { RecoveryWidget } from "@/components/dashboard/RecoveryWidget";
 
 export const dynamic = "force-dynamic";
 
@@ -92,9 +93,22 @@ export default async function DashboardPage() {
     ])
   ) as AllTypeStats;
 
-  const garminConn = await prisma.trackerConnection.findUnique({
-    where: { userId_provider: { userId, provider: "garmin" } },
-  });
+  const [garminConn, whoopConn] = await Promise.all([
+    prisma.trackerConnection.findUnique({ where: { userId_provider: { userId, provider: "garmin" } } }),
+    prisma.trackerConnection.findUnique({ where: { userId_provider: { userId, provider: "whoop" } } }),
+  ]);
+
+  // Today's WHOOP recovery (most recent record)
+  const todayRecovery = whoopConn
+    ? await prisma.whoopRecovery.findFirst({
+        where: { userId },
+        orderBy: { date: "desc" },
+        select: {
+          date: true, recoveryScore: true, hrv: true, restingHR: true,
+          totalSleepMin: true, sleepScore: true, strain: true,
+        },
+      })
+    : null;
 
   const name = session?.user?.name?.split(" ")[0] || "Athlete";
 
@@ -107,13 +121,21 @@ export default async function DashboardPage() {
           <h1 className="text-2xl font-bold text-white">{name} 👋</h1>
         </div>
         <div className="flex items-center gap-2">
-          {garminConn && <SyncButton />}
+          {(garminConn || whoopConn) && (
+            <SyncButton hasGarmin={!!garminConn} hasWhoop={!!whoopConn} />
+          )}
           <button className="relative w-9 h-9 flex items-center justify-center rounded-full bg-[var(--surface-2)] text-[var(--text-2)]">
             <Bell size={15} />
             <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#FF9500]" />
           </button>
         </div>
       </div>
+
+      {/* WHOOP Recovery widget */}
+      <RecoveryWidget
+        recovery={todayRecovery ?? null}
+        whoopConnected={!!whoopConn}
+      />
 
       {/* Per-type overall stats */}
       <OverallStatsCard stats={overallStats} />

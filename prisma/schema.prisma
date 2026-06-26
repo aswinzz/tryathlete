@@ -17,11 +17,12 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  accounts    Account[]
-  sessions    Session[]
-  activities  Activity[]
-  connections TrackerConnection[]
-  workoutPlans WorkoutPlan[]
+  accounts       Account[]
+  sessions       Session[]
+  activities     Activity[]
+  connections    TrackerConnection[]
+  workoutPlans   WorkoutPlan[]
+  whoopRecoveries WhoopRecovery[]
 
   mcpToken    String?  @unique // auth token for MCP endpoint
 }
@@ -62,16 +63,18 @@ model VerificationToken {
 }
 
 model TrackerConnection {
-  id           String   @id @default(cuid())
-  userId       String
-  provider     String   // "garmin" | "apple" | "coros" | "whoop"
-  accessToken  String?
-  refreshToken String?
-  tokenExpiry  DateTime?
+  id             String    @id @default(cuid())
+  userId         String
+  provider       String    // "garmin" | "whoop" | "apple" | "coros"
+  accessToken    String?
+  refreshToken   String?
+  tokenExpiry    DateTime?
   garminUsername String?
-  garminPassword String? // encrypted
-  connectedAt  DateTime @default(now())
-  lastSyncAt   DateTime?
+  garminPassword String?   // encrypted
+  connectedAt    DateTime  @default(now())
+  lastSyncAt     DateTime?
+  // JSON: {"syncActivities":true,"syncRecovery":true,"syncSleep":true}
+  dataPrefs      String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -82,6 +85,8 @@ model Activity {
   id          String   @id @default(cuid())
   userId      String
   garminId    String?  @unique
+  whoopId     String?  @unique
+  source      String   @default("garmin") // "garmin" | "whoop" | "manual"
   name        String
   type        String   // "running" | "cycling" | "swimming" | "strength"
   startTime   DateTime
@@ -218,6 +223,42 @@ model PlanActivityLink {
   activity Activity     @relation(fields: [activityId], references: [id], onDelete: Cascade)
 
   @@unique([entryId, activityId])
+}
+
+// ─── WHOOP Recovery / Sleep / Strain ─────────────────────────────────────────
+
+model WhoopRecovery {
+  id            String    @id @default(cuid())
+  userId        String
+  whoopCycleId  Int
+  date          DateTime  // start of the WHOOP cycle/day
+  // Recovery
+  recoveryScore Int?      // 0–100
+  hrv           Float?    // hrv_rmssd_milli
+  restingHR     Int?
+  spo2          Float?    // percentage
+  skinTemp      Float?    // celsius
+  // Sleep
+  sleepId       String?   // UUID in WHOOP v2
+  totalSleepMin Int?
+  remMin        Int?
+  deepMin       Int?
+  lightMin      Int?
+  awakeMin      Int?
+  sleepScore    Int?      // sleep_performance_percentage
+  sleepEff      Float?    // sleep_efficiency_percentage
+  // Strain / Cycle
+  strain        Float?    // 0–21
+  kilojoule     Float?
+  avgHR         Int?
+  maxHR         Int?
+  cycleEnd      DateTime?
+  rawData       String?   // full JSON blob
+  createdAt     DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, whoopCycleId])
 }
 
 // ─── Activity Laps ────────────────────────────────────────────────────────────

@@ -3,7 +3,12 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { RefreshCw } from "lucide-react";
 
-export function SyncButton() {
+interface Props {
+  hasGarmin?: boolean;
+  hasWhoop?:  boolean;
+}
+
+export function SyncButton({ hasGarmin = true, hasWhoop = false }: Props) {
   const router = useRouter();
   const [syncing, setSyncing] = useState(false);
 
@@ -11,10 +16,13 @@ export function SyncButton() {
     if (syncing) return;
     setSyncing(true);
     try {
-      await fetch("/api/garmin/sync", { method: "POST" });
+      const calls: Promise<Response>[] = [];
+      if (hasGarmin) calls.push(fetch("/api/garmin/sync", { method: "POST" }));
+      if (hasWhoop)  calls.push(fetch("/api/whoop/sync",  { method: "POST" }));
+      await Promise.allSettled(calls);
       router.refresh();
     } catch {
-      // silent fail — user can retry
+      // silent fail
     } finally {
       setSyncing(false);
     }
@@ -25,7 +33,7 @@ export function SyncButton() {
       onClick={handleSync}
       disabled={syncing}
       className="w-9 h-9 flex items-center justify-center rounded-full bg-[var(--surface-2)] text-[var(--text-2)] hover:text-[var(--accent)] transition-colors disabled:opacity-50"
-      title="Sync Garmin"
+      title="Sync"
     >
       <RefreshCw size={15} className={syncing ? "animate-spin" : ""} />
     </button>
