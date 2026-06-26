@@ -66,7 +66,7 @@ export function RetroCard({
   const { value: heroValue, unit: heroUnit } = resolveHero(config, data);
   // Retro shows more stats in the right column — use up to 5
   const stats = resolveStats(config, data, 5);
-  const showLaps = config.show.laps && laps.length > 0;
+  const showLaps = config.show.laps && laps.length > 1;
 
   // Glass mode overrides: flip to white text for readability over photos
   const text  = glass ? "#ffffff" : "#1a1a1a";

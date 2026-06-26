@@ -67,7 +67,7 @@ export function DarkCard({
   const data = { type, duration, distance, avgPace, avgHeartRate, maxHeartRate, calories, elevGain, steps };
   const { value: heroValue, unit: heroUnit } = resolveHero(config, data);
   const quickStats = resolveStats(config, data, 3);
-  const showLaps = config.show.laps && laps.length > 0;
+  const showLaps = config.show.laps && laps.length > 1;
 
   // In glass mode, borders become subtle white lines
   const bdr = glass ? "rgba(255,255,255,0.13)" : "#1e1e1e";

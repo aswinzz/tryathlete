@@ -160,7 +160,7 @@ export function availableHeroOptions(data: ActivityData): HeroStat[] {
  */
 export function availableShowToggles(
   data: ActivityData,
-  opts: { formatSupportsLaps?: boolean; formatSupportsRoute?: boolean; hasRoute?: boolean } = {}
+  opts: { formatSupportsLaps?: boolean; formatSupportsRoute?: boolean; hasRoute?: boolean; lapCount?: number } = {}
 ): (keyof CardConfig["show"])[] {
   const isEndurance = getActivityCategory(data.type) === "endurance";
   const toggles: (keyof CardConfig["show"])[] = [];
@@ -170,7 +170,7 @@ export function availableShowToggles(
   if (data.avgHeartRate) toggles.push("heartRate");
   if (data.calories) toggles.push("calories");
   if (data.elevGain) toggles.push("elevation");
-  if (isEndurance && opts.formatSupportsLaps !== false) toggles.push("laps");
+  if (isEndurance && opts.formatSupportsLaps !== false && (opts.lapCount ?? 0) > 1) toggles.push("laps");
   if (data.steps) toggles.push("steps");
   if (opts.hasRoute && opts.formatSupportsRoute) toggles.push("route");
   return toggles;

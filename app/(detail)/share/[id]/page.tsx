@@ -739,6 +739,7 @@ export default function SharePage() {
           formatSupportsLaps: LAPS_FORMATS.includes(format),
           formatSupportsRoute: ROUTE_FORMATS.includes(format),
           hasRoute: !!parsedRoutePoints,
+          lapCount: activity.laps?.length ?? 0,
         });
         return (
           <div className="px-5 mb-4 space-y-3">

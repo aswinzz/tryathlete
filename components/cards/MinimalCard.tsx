@@ -50,7 +50,7 @@ export function MinimalCard({
   const data = { type, duration, distance, avgPace, avgHeartRate, maxHeartRate, calories, elevGain, steps };
   const { value: heroValue, unit: heroUnit } = resolveHero(config, data);
   const stats = resolveStats(config, data, 3);
-  const showLaps = config.show.laps && laps.length > 0;
+  const showLaps = config.show.laps && laps.length > 1;
 
   // In glass mode, text flips to white for readability over photos
   const text  = glass ? "#ffffff" : "#0a0a0a";

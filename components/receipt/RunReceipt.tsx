@@ -134,7 +134,7 @@ export function RunReceipt({
   }
 
   const paceColLabel = isSwim ? "PACE/100" : isCycle ? "SPEED" : "PACE";
-  const showLaps = config.show.laps && laps.length > 0;
+  const showLaps = config.show.laps && laps.length > 1;
 
   return (
     <div style={{ padding: "0 4px" }}>
