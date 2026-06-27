@@ -1,6 +1,6 @@
 "use client";
 import { useMemo } from "react";
-import { getActivityTypeLabel, formatDurationShort } from "@/lib/utils";
+import { getActivityTypeLabel, formatDurationShort, getHRZone } from "@/lib/utils";
 import { format as fmtDate } from "date-fns";
 
 const ZONE_COLORS: Record<number, string> = {
@@ -30,20 +30,12 @@ export interface HRZoneCardProps {
   glass?: boolean;
 }
 
-function zoneForBpm(bpm: number, maxHR = 190) {
-  const p = bpm / maxHR;
-  if (p < 0.6) return 1;
-  if (p < 0.7) return 2;
-  if (p < 0.8) return 3;
-  if (p < 0.9) return 4;
-  return 5;
-}
-
 export function HRZoneCard({
   cardRef, name, type, startTime, duration,
   avgHeartRate, maxHeartRate, minHeartRate,
-  hrStream, hrZones, maxHR = 190, glass = false,
+  hrStream, hrZones, maxHR = 200, glass = false,
 }: HRZoneCardProps) {
+  const effectiveMaxHR = maxHR;
   const points: HRPoint[] = useMemo(() => {
     try { return hrStream ? JSON.parse(hrStream) : []; } catch { return []; }
   }, [hrStream]);
@@ -76,7 +68,7 @@ export function HRZoneCard({
     for (let i = 1; i < points.length; i++) {
       const { t: t0, bpm: b0 } = points[i - 1];
       const { t: t1, bpm: b1 } = points[i];
-      const color = ZONE_COLORS[zoneForBpm((b0 + b1) / 2, maxHR)];
+      const color = ZONE_COLORS[getHRZone((b0 + b1) / 2, effectiveMaxHR)];
       segments.push({
         d: `M ${toX(t0).toFixed(1)} ${toY(b0).toFixed(1)} L ${toX(t1).toFixed(1)} ${toY(b1).toFixed(1)}`,
         color,

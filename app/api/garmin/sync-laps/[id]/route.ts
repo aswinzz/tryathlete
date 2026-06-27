@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { getGarminClient, getHRZone } from "@/lib/garmin";
+import { getGarminClient } from "@/lib/garmin";
+import { getHRZone } from "@/lib/utils";
 
 interface GarminLap {
   distance?: number;

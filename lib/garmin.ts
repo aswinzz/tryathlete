@@ -2,6 +2,7 @@ import { GarminConnect } from "garmin-connect";
 import { prisma } from "./prisma";
 import { downsample } from "./routeUtils";
 import { reconcileActivity } from "./planReconciler";
+import { getHRZone } from "./utils";
 
 /**
  * Parse a Garmin time string (e.g. "2024-03-15 07:30:00") as UTC.
@@ -209,15 +210,6 @@ export function formatDuration(seconds: number): string {
 
 export function formatDistance(meters: number): string {
   return (meters / 1000).toFixed(2);
-}
-
-export function getHRZone(bpm: number, maxHR = 190): number {
-  const pct = bpm / maxHR;
-  if (pct < 0.6) return 1;
-  if (pct < 0.7) return 2;
-  if (pct < 0.8) return 3;
-  if (pct < 0.9) return 4;
-  return 5;
 }
 
 export const ZONE_COLORS: Record<number, string> = {

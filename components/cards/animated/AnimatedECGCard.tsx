@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef } from "react";
 import { CardConfig, DEFAULT_CONFIG, resolveStats } from "@/lib/cardConfig";
-import { getActivityTypeLabel } from "@/lib/utils";
+import { getActivityTypeLabel, getHRZone } from "@/lib/utils";
 import { format as fmtDate } from "date-fns";
 import { type RoutePoint, projectRouteToCanvas } from "@/lib/routeUtils";
 
@@ -97,15 +97,6 @@ const ZONE_COLORS_ECG: Record<number, string> = {
   1: "#4ECDC4", 2: "#45B7D1", 3: "#9B59B6", 4: "#FF6B9D", 5: "#FF4757",
 };
 
-function zoneForBpmECG(bpm: number, maxHR = 190): number {
-  const p = bpm / maxHR;
-  if (p < 0.6) return 1;
-  if (p < 0.7) return 2;
-  if (p < 0.8) return 3;
-  if (p < 0.9) return 4;
-  return 5;
-}
-
 /** Convert real HR stream → canvas points with zone-coloring metadata */
 function buildRealHRPath(
   hrPts: { t: number; bpm: number }[],
@@ -124,7 +115,7 @@ function buildRealHRPath(
   }));
   const colors = hrPts.slice(1).map((p, i) => {
     const midBpm = (hrPts[i].bpm + p.bpm) / 2;
-    return ZONE_COLORS_ECG[zoneForBpmECG(midBpm, maxHR)];
+    return ZONE_COLORS_ECG[getHRZone(midBpm, maxHR)];
   });
   return { pts, colors };
 }
@@ -136,8 +127,9 @@ export function AnimatedECGCard({
   animKey = 0,
   routePoints,
   hrStream,
-  maxHR = 190,
+  maxHR = 200,
 }: AnimatedECGCardProps) {
+  const effectiveMaxHR = maxHR;
   const localRef = useRef<HTMLCanvasElement>(null);
   const ref = (canvasRef ?? localRef) as React.RefObject<HTMLCanvasElement>;
 
@@ -160,7 +152,7 @@ export function AnimatedECGCard({
       if (hrStream) {
         const parsed: { t: number; bpm: number }[] = JSON.parse(hrStream);
         if (parsed.length >= 4) {
-          const { pts, colors } = buildRealHRPath(parsed, ECG_CENTER_Y, AMPLITUDE, maxHR);
+          const { pts, colors } = buildRealHRPath(parsed, ECG_CENTER_Y, AMPLITUDE, effectiveMaxHR);
           realHRPts  = pts;
           realHRColors = colors;
           useRealHR  = pts.length > 1;

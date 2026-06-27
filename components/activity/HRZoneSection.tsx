@@ -1,6 +1,6 @@
 "use client";
 import { useMemo } from "react";
-import { formatDurationShort } from "@/lib/utils";
+import { formatDurationShort, getHRZone } from "@/lib/utils";
 
 const ZONE_COLORS: Record<number, string> = {
   1: "#4ECDC4",
@@ -20,21 +20,14 @@ interface Props {
   minHeartRate: number | null;
   avgHeartRate: number | null;
   maxHeartRate: number | null;
+  /** Override zone ceiling. Defaults to maxHeartRate if available, else 190. */
   maxHR?: number;
 }
 
-function zoneForBpm(bpm: number, maxHR = 190): number {
-  const p = bpm / maxHR;
-  if (p < 0.6) return 1;
-  if (p < 0.7) return 2;
-  if (p < 0.8) return 3;
-  if (p < 0.9) return 4;
-  return 5;
-}
-
 export function HRZoneSection({
-  hrStream, hrZones, minHeartRate, avgHeartRate, maxHeartRate, maxHR = 190,
+  hrStream, hrZones, minHeartRate, avgHeartRate, maxHeartRate, maxHR = 200,
 }: Props) {
+  const effectiveMaxHR = maxHR;
   const points: HRPoint[] = useMemo(() => {
     try { return hrStream ? JSON.parse(hrStream) : []; } catch { return []; }
   }, [hrStream]);
@@ -67,7 +60,7 @@ export function HRZoneSection({
       const { t: t0, bpm: b0 } = points[i - 1];
       const { t: t1, bpm: b1 } = points[i];
       const midBpm = (b0 + b1) / 2;
-      const color = ZONE_COLORS[zoneForBpm(midBpm, maxHR)];
+      const color = ZONE_COLORS[getHRZone(midBpm, effectiveMaxHR)];
       segments.push({
         d: `M ${toX(t0).toFixed(1)} ${toY(b0).toFixed(1)} L ${toX(t1).toFixed(1)} ${toY(b1).toFixed(1)}`,
         color,

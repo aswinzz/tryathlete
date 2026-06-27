@@ -14,6 +14,7 @@ import { prisma } from "./prisma";
 import type { RoutePoint } from "./routeUtils";
 import { downsample } from "./routeUtils";
 import { parseDataPrefs } from "./whoop";
+import { getHRZone } from "./utils";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -212,20 +213,14 @@ interface StravaStreams {
   heartrate?: { data: number[] };
 }
 
-function zoneForBpm(bpm: number, maxHR = 190): number {
-  const p = bpm / maxHR;
-  if (p < 0.6) return 1;
-  if (p < 0.7) return 2;
-  if (p < 0.8) return 3;
-  if (p < 0.9) return 4;
-  return 5;
-}
-
 /** Fetch HR stream from Strava and return hrStream + hrZones JSON strings */
 export async function fetchStravaHR(
   userId: string,
-  stravaActivityId: string | number
+  stravaActivityId: string | number,
+  /** Optional override for zone boundaries. Uses standard default (200 bpm) when not provided. */
+  activityMaxHR?: number | null
 ): Promise<{ hrStream: string | null; hrZones: string | null; minHeartRate: number | null }> {
+  const maxHR = activityMaxHR ?? 200;
   try {
     const streams = await stravaFetch<StravaStreams>(
       userId,
@@ -242,11 +237,11 @@ export async function fetchStravaHR(
       points.push({ t: times[i], bpm: bpms[i] });
     }
 
-    // Compute zone seconds
+    // Compute zone seconds using activity's actual max HR for accurate zones
     const zones = { z1: 0, z2: 0, z3: 0, z4: 0, z5: 0 };
     for (let i = 1; i < times.length; i++) {
       const dt = times[i] - times[i - 1];
-      const z = zoneForBpm(bpms[i]);
+      const z = getHRZone(bpms[i], maxHR);
       (zones as Record<string, number>)[`z${z}`] += dt;
     }
 

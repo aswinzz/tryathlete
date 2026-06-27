@@ -53,7 +53,18 @@ export function formatDurationShort(seconds: number): string {
   return `${s}s`;
 }
 
-export function getHRZone(bpm: number, maxHR = 190): number {
+/**
+ * Classify a heart-rate reading into one of 5 standard zones.
+ *
+ * Uses a fixed reference of maxHR = 200 bpm, giving widely-recognised
+ * round thresholds that feel correct for most adults:
+ *   Z1 Recovery   < 120 bpm   (< 60 %)
+ *   Z2 Aerobic    120–140 bpm (60–70 %)
+ *   Z3 Tempo      140–160 bpm (70–80 %)
+ *   Z4 Threshold  160–180 bpm (80–90 %)
+ *   Z5 Max        ≥ 180 bpm   (≥ 90 %)
+ */
+export function getHRZone(bpm: number, maxHR = 200): number {
   const pct = bpm / maxHR;
   if (pct < 0.6) return 1;
   if (pct < 0.7) return 2;
