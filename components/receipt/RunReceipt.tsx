@@ -2,7 +2,9 @@
 import {
   formatPace,
   formatDuration,
+  formatDurationNoSecs,
   formatDistance,
+  formatDistanceRounded,
   formatSpeed,
   formatPace100m,
   getActivityCategory,
@@ -102,13 +104,16 @@ export function RunReceipt({
   const maxHRVal = hrValues.length ? Math.max(...hrValues) : maxHeartRate;
   const maxBarH = Math.max(...hrValues, 1);
 
+  const durFmt  = config.hideSeconds   ? formatDurationNoSecs  : formatDuration;
+  const distFmt = config.roundDistance ? formatDistanceRounded : formatDistance;
+
   // Build summary rows — respecting config.show toggles
   const summaryRows: { label: string; value: string }[] = [];
   if (config.show.distance && isEndurance && distance) {
-    summaryRows.push({ label: "TOTAL", value: isSwim ? `${Math.round(distance)} M` : `${formatDistance(distance)} KM` });
+    summaryRows.push({ label: "TOTAL", value: isSwim ? `${Math.round(distance)} M` : `${distFmt(distance)} KM` });
   }
   if (config.show.time) {
-    summaryRows.push({ label: "DURATION", value: formatDuration(duration) });
+    summaryRows.push({ label: "DURATION", value: durFmt(duration) });
   }
   if (config.show.pace && avgPace && isEndurance) {
     summaryRows.push({
@@ -207,7 +212,7 @@ export function RunReceipt({
                       <span style={{ display: "flex", justifyContent: "center" }}>
                         <span style={{ width: 10, height: 10, borderRadius: "50%", background: zoneColor, display: "inline-block" }} />
                       </span>
-                      <span style={{ color: "#555", fontSize: 11, textAlign: "center" }}>{formatDuration(lap.duration)}</span>
+                      <span style={{ color: "#555", fontSize: 11, textAlign: "center" }}>{durFmt(lap.duration)}</span>
                       <span style={{ color: "#555", fontSize: 11, textAlign: "right" }}>{lap.avgHeartRate ?? "—"}</span>
                     </div>
                   );

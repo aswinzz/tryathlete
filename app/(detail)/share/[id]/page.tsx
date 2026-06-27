@@ -147,6 +147,9 @@ export default function SharePage() {
   function setTitleMode(titleMode: CardConfig["titleMode"]) {
     setConfig((c) => ({ ...c, titleMode }));
   }
+  function toggleHideSeconds() {
+    setConfig((c) => ({ ...c, hideSeconds: !c.hideSeconds }));
+  }
 
   async function saveName() {
     if (!nameInput.trim() || !activity) return;
@@ -778,6 +781,54 @@ export default function SharePage() {
                       }}
                     >
                       {HERO_LABELS[h]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {/* Distance format — only when distance is visible somewhere */}
+            {(config.hero === "distance" || config.show.distance) && (
+              <div>
+                <p className="text-[9px] font-bold text-[var(--text-3)] uppercase tracking-widest mb-2">Distance format</p>
+                <div className="flex gap-2">
+                  {([
+                    { label: "5.01 km", value: false },
+                    { label: "5.0 km",  value: true  },
+                  ] as const).map(({ label, value }) => (
+                    <button
+                      key={label}
+                      onClick={() => setConfig((c) => ({ ...c, roundDistance: value }))}
+                      className="text-[11px] font-semibold px-3 py-1.5 rounded-full transition-all"
+                      style={{
+                        background: config.roundDistance === value ? "var(--accent)" : "var(--surface-2)",
+                        color: config.roundDistance === value ? "#000" : "var(--text-2)",
+                      }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {/* Seconds toggle — only when time is visible somewhere */}
+            {(config.hero === "time" || config.show.time) && (
+              <div>
+                <p className="text-[9px] font-bold text-[var(--text-3)] uppercase tracking-widest mb-2">Time format</p>
+                <div className="flex gap-2">
+                  {([
+                    { label: "H:MM:SS", value: false },
+                    { label: "H:MM",    value: true  },
+                  ] as const).map(({ label, value }) => (
+                    <button
+                      key={label}
+                      onClick={() => setConfig((c) => ({ ...c, hideSeconds: value }))}
+                      className="text-[11px] font-semibold px-3 py-1.5 rounded-full transition-all"
+                      style={{
+                        background: config.hideSeconds === value ? "var(--accent)" : "var(--surface-2)",
+                        color: config.hideSeconds === value ? "#000" : "var(--text-2)",
+                      }}
+                    >
+                      {label}
                     </button>
                   ))}
                 </div>

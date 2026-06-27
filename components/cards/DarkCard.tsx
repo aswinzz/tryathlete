@@ -1,6 +1,7 @@
 "use client";
 import {
   formatDuration,
+  formatDurationNoSecs,
   formatPace,
   formatSpeed,
   formatPace100m,
@@ -68,6 +69,7 @@ export function DarkCard({
   const { value: heroValue, unit: heroUnit } = resolveHero(config, data);
   const quickStats = resolveStats(config, data, 3);
   const showLaps = config.show.laps && laps.length > 1;
+  const durFmt = config.hideSeconds ? formatDurationNoSecs : formatDuration;
 
   // In glass mode, borders become subtle white lines
   const bdr = glass ? "rgba(255,255,255,0.13)" : "#1e1e1e";
@@ -134,7 +136,7 @@ export function DarkCard({
                 <span style={{ display: "flex", justifyContent: "center" }}>
                   <span style={{ width: 9, height: 9, borderRadius: "50%", background: zoneColor, display: "inline-block" }} />
                 </span>
-                <span style={{ fontFamily: "system-ui, sans-serif", fontSize: 11, color: TEXT2, textAlign: "center" }}>{formatDuration(lap.duration)}</span>
+                <span style={{ fontFamily: "system-ui, sans-serif", fontSize: 11, color: TEXT2, textAlign: "center" }}>{durFmt(lap.duration)}</span>
                 <span style={{ fontFamily: "system-ui, sans-serif", fontSize: 11, color: TEXT2, textAlign: "right" }}>{lap.avgHeartRate ?? "—"}</span>
               </div>
             );

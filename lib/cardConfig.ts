@@ -1,7 +1,9 @@
 import {
   formatPace,
   formatDuration,
+  formatDurationNoSecs,
   formatDistance,
+  formatDistanceRounded,
   formatSpeed,
   formatPace100m,
   getActivityCategory,
@@ -13,6 +15,8 @@ export type TitleMode = "type" | "name";
 export interface CardConfig {
   hero: HeroStat;
   titleMode: TitleMode;
+  hideSeconds: boolean;
+  roundDistance: boolean;
   show: {
     pace: boolean;
     time: boolean;
@@ -29,6 +33,8 @@ export interface CardConfig {
 export const DEFAULT_CONFIG: CardConfig = {
   hero: "distance",
   titleMode: "type",
+  hideSeconds: false,
+  roundDistance: false,
   show: {
     pace: true,
     time: true,
@@ -63,6 +69,8 @@ export function resolveHero(
   const isSwim = t.includes("swim");
   const isCycle = t.includes("cycl") || t.includes("bike") || t.includes("ride");
   const isEndurance = getActivityCategory(data.type) === "endurance";
+  const durFmt  = config.hideSeconds    ? formatDurationNoSecs  : formatDuration;
+  const distFmt = config.roundDistance  ? formatDistanceRounded : formatDistance;
 
   if (config.hero === "pace" && data.avgPace) {
     if (isSwim) return { value: formatPace100m(data.avgPace), unit: "/100M" };
@@ -72,11 +80,11 @@ export function resolveHero(
 
   if (config.hero === "distance" && isEndurance && data.distance) {
     if (isSwim) return { value: `${Math.round(data.distance)}`, unit: "M" };
-    return { value: formatDistance(data.distance), unit: "KM" };
+    return { value: distFmt(data.distance), unit: "KM" };
   }
 
   // Fallback: duration
-  return { value: formatDuration(data.duration), unit: "" };
+  return { value: durFmt(data.duration), unit: "" };
 }
 
 /** Resolve secondary stats list based on config (capped at maxStats) */
@@ -91,13 +99,15 @@ export function resolveStats(
   const isEndurance = getActivityCategory(data.type) === "endurance";
 
   const candidates: { label: string; value: string }[] = [];
+  const durFmt  = config.hideSeconds   ? formatDurationNoSecs  : formatDuration;
+  const distFmt = config.roundDistance ? formatDistanceRounded : formatDistance;
 
   // Distance (only as secondary if hero is not distance)
   if (config.show.distance && config.hero !== "distance" && data.distance && isEndurance) {
     if (isSwim)
       candidates.push({ label: "DISTANCE", value: `${Math.round(data.distance)}m` });
     else
-      candidates.push({ label: "DISTANCE", value: `${formatDistance(data.distance)} km` });
+      candidates.push({ label: "DISTANCE", value: `${distFmt(data.distance)} km` });
   }
 
   // Pace / Speed
@@ -112,7 +122,7 @@ export function resolveStats(
 
   // Duration (only as secondary if hero is not time)
   if (config.show.time && config.hero !== "time") {
-    candidates.push({ label: "DURATION", value: formatDuration(data.duration) });
+    candidates.push({ label: "DURATION", value: durFmt(data.duration) });
   }
 
   // Heart rate

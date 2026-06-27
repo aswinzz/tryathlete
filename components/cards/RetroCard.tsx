@@ -1,6 +1,7 @@
 "use client";
 import {
   formatDuration,
+  formatDurationNoSecs,
   formatPace,
   formatSpeed,
   formatPace100m,
@@ -67,6 +68,7 @@ export function RetroCard({
   // Retro shows more stats in the right column — use up to 5
   const stats = resolveStats(config, data, 5);
   const showLaps = config.show.laps && laps.length > 1;
+  const durFmt = config.hideSeconds ? formatDurationNoSecs : formatDuration;
 
   // Glass mode overrides: flip to white text for readability over photos
   const text  = glass ? "#ffffff" : "#1a1a1a";
@@ -150,7 +152,7 @@ export function RetroCard({
                 <span style={{ display: "flex", justifyContent: "center" }}>
                   <span style={{ width: 8, height: 8, borderRadius: "50%", background: zoneColor, display: "inline-block" }} />
                 </span>
-                <span style={{ ...MONO, fontSize: 10, color: text2, textAlign: "center" }}>{formatDuration(lap.duration)}</span>
+                <span style={{ ...MONO, fontSize: 10, color: text2, textAlign: "center" }}>{durFmt(lap.duration)}</span>
                 <span style={{ ...MONO, fontSize: 10, color: text2, textAlign: "right" }}>{lap.avgHeartRate ?? "—"}</span>
               </div>
             );

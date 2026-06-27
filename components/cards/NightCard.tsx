@@ -1,6 +1,7 @@
 "use client";
 import {
   formatDuration,
+  formatDurationNoSecs,
   formatPace,
   formatSpeed,
   formatPace100m,
@@ -69,6 +70,7 @@ export function NightCard({
   const { value: heroValue, unit: heroUnit } = resolveHero(config, data);
   const quickStats = resolveStats(config, data, 3);
   const showLaps = config.show.laps && laps.length > 1;
+  const durFmt = config.hideSeconds ? formatDurationNoSecs : formatDuration;
 
   const ghostNum = heroValue.split(".")[0].split(":")[0];
   const bdr = glass ? "rgba(129,140,248,0.25)" : "rgba(129,140,248,0.15)";
@@ -144,7 +146,7 @@ export function NightCard({
                 <span style={{ display: "flex", justifyContent: "center" }}>
                   <span style={{ width: 9, height: 9, borderRadius: "50%", background: zoneColor, display: "inline-block" }} />
                 </span>
-                <span style={{ fontFamily: "system-ui, sans-serif", fontSize: 11, color: TEXT2, textAlign: "center" }}>{formatDuration(lap.duration)}</span>
+                <span style={{ fontFamily: "system-ui, sans-serif", fontSize: 11, color: TEXT2, textAlign: "center" }}>{durFmt(lap.duration)}</span>
                 <span style={{ fontFamily: "system-ui, sans-serif", fontSize: 11, color: TEXT2, textAlign: "right" }}>{lap.avgHeartRate ?? "—"}</span>
               </div>
             );

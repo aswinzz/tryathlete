@@ -21,8 +21,22 @@ export function formatDuration(seconds: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
+/** Like formatDuration but drops seconds when duration >= 1 hour (H:MM:SS → H:MM) */
+export function formatDurationNoSecs(seconds: number): string {
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  if (h > 0) return `${h}:${m.toString().padStart(2, "0")}`;
+  const s = seconds % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
 export function formatDistance(meters: number): string {
   return (meters / 1000).toFixed(2);
+}
+
+/** Rounds to nearest 0.1 km — e.g. 5010m → "5.0", 4990m → "5.0" */
+export function formatDistanceRounded(meters: number): string {
+  return (Math.round(meters / 100) / 10).toFixed(1);
 }
 
 export function formatDistanceKm(meters: number): string {

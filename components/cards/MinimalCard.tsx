@@ -1,5 +1,5 @@
 "use client";
-import { formatDuration, getActivityTypeLabel } from "@/lib/utils";
+import { formatDuration, formatDurationNoSecs, getActivityTypeLabel } from "@/lib/utils";
 import { format } from "date-fns";
 import { CardConfig, DEFAULT_CONFIG, resolveHero, resolveStats } from "@/lib/cardConfig";
 import { RouteMapSvg } from "@/components/cards/RouteMapSvg";
@@ -51,6 +51,7 @@ export function MinimalCard({
   const { value: heroValue, unit: heroUnit } = resolveHero(config, data);
   const stats = resolveStats(config, data, 3);
   const showLaps = config.show.laps && laps.length > 1;
+  const durFmt = config.hideSeconds ? formatDurationNoSecs : formatDuration;
 
   // In glass mode, text flips to white for readability over photos
   const text  = glass ? "#ffffff" : "#0a0a0a";
@@ -103,7 +104,7 @@ export function MinimalCard({
             {laps.map((lap, i) => (
               <div key={lap.lapIndex} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: `1px solid ${bdr}` }}>
                 <span style={{ fontFamily: "system-ui, sans-serif", fontSize: 12, color: text2 }}>Lap {i + 1}</span>
-                <span style={{ fontFamily: "system-ui, sans-serif", fontSize: 12, fontWeight: 600, color: text }}>{formatDuration(lap.duration)}</span>
+                <span style={{ fontFamily: "system-ui, sans-serif", fontSize: 12, fontWeight: 600, color: text }}>{durFmt(lap.duration)}</span>
               </div>
             ))}
           </div>
