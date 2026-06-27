@@ -232,6 +232,61 @@ const TOOLS = [
       required: ["planId", "weekNumber", "days"],
     },
   },
+  // ── Activity tools ─────────────────────────────────────────────────────────
+  {
+    name: "list_activities",
+    description: "List the athlete's recent activities (runs, rides, swims, strength sessions, etc.) with key performance metrics. Use this to understand what workouts were actually performed, check training volume, or find activities to analyse in detail.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        days:  { type: "number", description: "How many days back to look (default: 7, max: 90)" },
+        type:  { type: "string", description: "Optional filter: 'running', 'cycling', 'swimming', 'strength', etc." },
+        limit: { type: "number", description: "Max activities to return (default: 20, max: 50)" },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "get_activity",
+    description: "Get full details of a single activity: pace/speed, heart rate zones breakdown, per-lap splits, elevation, calories, and which plan entry it was linked to (if any). Use after list_activities to drill into a specific session.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        activityId: { type: "string", description: "Activity ID from list_activities" },
+      },
+      required: ["activityId"],
+    },
+  },
+  {
+    name: "get_week_summary",
+    description: "Compare planned workouts vs actual activities for a given calendar week. Shows each day's plan entries alongside what was actually done, completion rate, total volume (distance, duration, load), and WHOOP recovery if available. Essential for weekly check-ins and coaching reviews.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        weekOffset: {
+          type: "number",
+          description: "0 = current week (Mon–Sun), -1 = last week, -2 = two weeks ago, etc. Default: 0",
+        },
+        planId: {
+          type: "string",
+          description: "Optional plan ID to use for the planned side. Defaults to the active plan.",
+        },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "get_training_load",
+    description: "Get rolling training load and volume trends over recent weeks. Returns weekly summaries of total distance, duration, and activity count to help spot overtraining, under-training, or trend changes. Use to inform taper/peak decisions or to assess adaptation.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        weeks: { type: "number", description: "How many weeks of history to return (default: 4, max: 12)" },
+      },
+      required: [],
+    },
+  },
+  // ── Wellness tools ─────────────────────────────────────────────────────────
   {
     name: "get_wellness_today",
     description: "Get today's WHOOP wellness snapshot: recovery score (0–100), HRV, resting heart rate, sleep duration and quality, and daily strain. Use this before making any training recommendations to understand the athlete's current readiness. Returns null for each field if WHOOP is not connected or data has not synced yet.",
@@ -561,6 +616,347 @@ async function callTool(
 
       return { message: `Plan populated: ${totalWeeks} weeks, ${totalDays} days, ${totalEntries} entries created` };
     }
+
+    // ── Activity tool implementations ────────────────────────────────────────
+
+    case "list_activities": {
+      const daysBack = Math.min(Math.max(1, Number(args.days) || 7), 90);
+      const limit    = Math.min(Math.max(1, Number(args.limit) || 20), 50);
+      const since    = new Date(Date.now() - daysBack * 86_400_000);
+
+      const where: Record<string, unknown> = { userId, startTime: { gte: since } };
+      if (args.type) where.type = { contains: args.type as string, mode: "insensitive" };
+
+      const activities = await prisma.activity.findMany({
+        where,
+        orderBy: { startTime: "desc" },
+        take: limit,
+        select: {
+          id: true, name: true, type: true, source: true, startTime: true,
+          duration: true, distance: true, avgHeartRate: true, maxHeartRate: true,
+          avgPace: true, elevGain: true, calories: true,
+          links: { select: { entry: { select: { title: true, type: true, durationMin: true } } }, take: 1 },
+        },
+      });
+
+      return {
+        count: activities.length,
+        periodDays: daysBack,
+        activities: activities.map((a) => ({
+          id:          a.id,
+          name:        a.name,
+          type:        a.type,
+          source:      a.source,
+          date:        a.startTime.toISOString().split("T")[0],
+          time:        a.startTime.toISOString().split("T")[1].slice(0, 5),
+          duration_min: Math.round(a.duration / 60),
+          distance_km: a.distance ? Math.round(a.distance / 10) / 100 : null,
+          avg_pace:    a.avgPace ? `${Math.floor(a.avgPace * 1000 / 60)}'${String(Math.round(a.avgPace * 1000 % 60)).padStart(2, "0")}"/km` : null,
+          avg_hr_bpm:  a.avgHeartRate,
+          max_hr_bpm:  a.maxHeartRate,
+          elev_gain_m: a.elevGain ? Math.round(a.elevGain) : null,
+          calories:    a.calories,
+          linked_plan_entry: a.links[0]?.entry?.title ?? null,
+        })),
+      };
+    }
+
+    case "get_activity": {
+      const activity = await prisma.activity.findFirst({
+        where: { id: args.activityId as string, userId },
+        include: {
+          laps: { orderBy: { lapIndex: "asc" } },
+          links: {
+            include: {
+              entry: {
+                select: {
+                  title: true, type: true, description: true, durationMin: true,
+                  day: { select: { dayOfWeek: true, week: { select: { weekNumber: true, plan: { select: { title: true } } } } } },
+                },
+              },
+            },
+          },
+        },
+      });
+      if (!activity) throw new Error("Activity not found");
+
+      // Parse hrZones
+      let hrZones: Record<string, number> | null = null;
+      try { hrZones = activity.hrZones ? JSON.parse(activity.hrZones) : null; } catch { /* ignore */ }
+
+      const totalZoneSecs = hrZones
+        ? Object.values(hrZones).reduce((s: number, v) => s + (v as number), 0)
+        : 0;
+
+      const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+      return {
+        id:           activity.id,
+        name:         activity.name,
+        type:         activity.type,
+        source:       activity.source,
+        date:         activity.startTime.toISOString().split("T")[0],
+        startTime:    activity.startTime.toISOString(),
+        duration_min: Math.round(activity.duration / 60),
+        distance_km:  activity.distance ? Math.round(activity.distance / 10) / 100 : null,
+        avg_pace:     activity.avgPace ? `${Math.floor(activity.avgPace * 1000 / 60)}'${String(Math.round(activity.avgPace * 1000 % 60)).padStart(2, "0")}"/km` : null,
+        best_pace:    activity.bestPace ? `${Math.floor(activity.bestPace * 1000 / 60)}'${String(Math.round(activity.bestPace * 1000 % 60)).padStart(2, "0")}"/km` : null,
+        heart_rate: {
+          min: activity.minHeartRate,
+          avg: activity.avgHeartRate,
+          max: activity.maxHeartRate,
+        },
+        hr_zones: hrZones && totalZoneSecs > 0 ? {
+          z1_recovery_min:   hrZones.z1 ? Math.round(hrZones.z1 / 60) : 0,
+          z2_aerobic_min:    hrZones.z2 ? Math.round(hrZones.z2 / 60) : 0,
+          z3_tempo_min:      hrZones.z3 ? Math.round(hrZones.z3 / 60) : 0,
+          z4_threshold_min:  hrZones.z4 ? Math.round(hrZones.z4 / 60) : 0,
+          z5_max_min:        hrZones.z5 ? Math.round(hrZones.z5 / 60) : 0,
+          pct_above_z3: totalZoneSecs > 0
+            ? Math.round(((hrZones.z3 + hrZones.z4 + hrZones.z5) / totalZoneSecs) * 100)
+            : null,
+        } : null,
+        elev_gain_m: activity.elevGain ? Math.round(activity.elevGain) : null,
+        calories:    activity.calories,
+        steps:       activity.steps,
+        laps: activity.laps.map((l) => ({
+          lap:        l.lapIndex,
+          distance_km: Math.round(l.distance / 10) / 100,
+          duration_min: Math.round(l.duration / 60),
+          avg_hr_bpm: l.avgHeartRate,
+          zone:       l.zone,
+          pace:       l.avgPace ? `${Math.floor(l.avgPace * 1000 / 60)}'${String(Math.round(l.avgPace * 1000 % 60)).padStart(2, "0")}"` : null,
+        })),
+        linked_plan_entry: activity.links[0] ? {
+          title:      activity.links[0].entry.title,
+          type:       activity.links[0].entry.type,
+          description: activity.links[0].entry.description,
+          planned_duration_min: activity.links[0].entry.durationMin,
+          plan:       activity.links[0].entry.day.week.plan.title,
+          week:       activity.links[0].entry.day.week.weekNumber,
+          day:        DOW[(activity.links[0].entry.day.dayOfWeek ?? 1) - 1],
+        } : null,
+      };
+    }
+
+    case "get_week_summary": {
+      const offset = Number(args.weekOffset ?? 0);
+
+      // Calculate the Mon–Sun range for the requested week
+      const now = new Date();
+      const dayOfWeek = now.getUTCDay() === 0 ? 7 : now.getUTCDay(); // 1=Mon, 7=Sun
+      const mondayMs = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+        - (dayOfWeek - 1) * 86_400_000
+        + offset * 7 * 86_400_000;
+      const monday = new Date(mondayMs);
+      const sunday = new Date(mondayMs + 6 * 86_400_000 + 86_399_999);
+
+      // Fetch activities in this date range
+      const activities = await prisma.activity.findMany({
+        where: { userId, startTime: { gte: monday, lte: sunday } },
+        orderBy: { startTime: "asc" },
+        include: {
+          links: {
+            include: { entry: { select: { id: true, title: true, type: true, durationMin: true } } },
+            take: 1,
+          },
+        },
+      });
+
+      // Find the active (or specified) plan and the week that overlaps this date range
+      const plan = args.planId
+        ? await prisma.workoutPlan.findFirst({
+            where: { id: args.planId as string, userId },
+            select: { id: true, title: true, startDate: true },
+          })
+        : await prisma.workoutPlan.findFirst({
+            where: { userId, isActive: true },
+            select: { id: true, title: true, startDate: true },
+          });
+
+      let plannedDays: { dayOfWeek: number; type: string; coachNotes: string | null; entries: { title: string; type: string; durationMin: number | null; description: string | null }[] }[] = [];
+      let planWeekNumber: number | null = null;
+
+      if (plan?.startDate) {
+        // Compute which plan week this calendar week falls in
+        const planStartMs = Date.UTC(plan.startDate.getUTCFullYear(), plan.startDate.getUTCMonth(), plan.startDate.getUTCDate());
+        const weeksSincePlanStart = Math.floor((mondayMs - planStartMs) / (7 * 86_400_000));
+        planWeekNumber = weeksSincePlanStart + 1; // 1-based
+
+        if (planWeekNumber >= 1) {
+          const planWeek = await prisma.workoutWeek.findFirst({
+            where: { planId: plan.id, weekNumber: planWeekNumber },
+            include: { days: { include: { entries: { orderBy: { orderIndex: "asc" } } }, orderBy: { dayOfWeek: "asc" } } },
+          });
+          if (planWeek) {
+            plannedDays = planWeek.days.map((d) => ({
+              dayOfWeek: d.dayOfWeek,
+              type: d.type,
+              coachNotes: d.coachNotes,
+              entries: d.entries.map((e) => ({
+                title: e.title,
+                type: e.type,
+                durationMin: e.durationMin,
+                description: e.description,
+              })),
+            }));
+          }
+        }
+      }
+
+      // Build per-day summary
+      const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+      const days = DOW.map((label, i) => {
+        const dayOfWeek = i + 1;
+        const dayDate = new Date(mondayMs + i * 86_400_000);
+        const dayActivities = activities.filter((a) => {
+          const d = a.startTime.getUTCDay() === 0 ? 7 : a.startTime.getUTCDay();
+          return d === dayOfWeek;
+        });
+        const planned = plannedDays.find((d) => d.dayOfWeek === dayOfWeek);
+
+        return {
+          day:  label,
+          date: dayDate.toISOString().split("T")[0],
+          planned: planned ? {
+            type: planned.type,
+            coachNotes: planned.coachNotes,
+            workouts: planned.entries.map((e) => ({
+              title: e.title,
+              type:  e.type,
+              planned_duration_min: e.durationMin,
+              description: e.description,
+            })),
+          } : { type: "REST", workouts: [] },
+          actual: dayActivities.map((a) => ({
+            id:           a.id,
+            name:         a.name,
+            type:         a.type,
+            duration_min: Math.round(a.duration / 60),
+            distance_km:  a.distance ? Math.round(a.distance / 10) / 100 : null,
+            avg_hr_bpm:   a.avgHeartRate,
+            calories:     a.calories,
+            matched_entry: a.links[0]?.entry?.title ?? null,
+          })),
+          completed: dayActivities.length > 0,
+        };
+      });
+
+      // Aggregate totals
+      const totalActualMin  = Math.round(activities.reduce((s, a) => s + a.duration, 0) / 60);
+      const totalDistanceKm = Math.round(activities.reduce((s, a) => s + (a.distance ?? 0), 0) / 10) / 100;
+      const plannedWorkouts = plannedDays.reduce((s, d) => s + d.entries.length, 0);
+      const completedDays   = days.filter((d) => d.completed).length;
+
+      // WHOOP recovery data for this week
+      const whoopRecords = await prisma.whoopRecovery.findMany({
+        where: { userId, date: { gte: monday, lte: sunday } },
+        orderBy: { date: "asc" },
+        select: { date: true, recoveryScore: true, hrv: true, strain: true, totalSleepMin: true },
+      });
+
+      return {
+        week: {
+          label:   offset === 0 ? "Current week" : offset === -1 ? "Last week" : `${Math.abs(offset)} weeks ago`,
+          monday:  monday.toISOString().split("T")[0],
+          sunday:  sunday.toISOString().split("T")[0],
+          planName: plan?.title ?? null,
+          planWeek: planWeekNumber,
+        },
+        summary: {
+          planned_workouts: plannedWorkouts,
+          completed_days:   completedDays,
+          completion_rate:  plannedWorkouts > 0
+            ? `${Math.round((completedDays / Math.max(plannedDays.length, 1)) * 100)}%`
+            : "no plan",
+          total_activities: activities.length,
+          total_duration_min: totalActualMin,
+          total_distance_km:  totalDistanceKm,
+          avg_hr_bpm: activities.filter((a) => a.avgHeartRate).length > 0
+            ? Math.round(activities.filter((a) => a.avgHeartRate).reduce((s, a) => s + a.avgHeartRate!, 0) / activities.filter((a) => a.avgHeartRate).length)
+            : null,
+        },
+        wellness: whoopRecords.length > 0 ? whoopRecords.map((r) => ({
+          date:           r.date.toISOString().split("T")[0],
+          recovery_score: r.recoveryScore,
+          hrv_ms:         r.hrv !== null ? Math.round(r.hrv) : null,
+          strain:         r.strain,
+          sleep_min:      r.totalSleepMin,
+        })) : null,
+        days,
+      };
+    }
+
+    case "get_training_load": {
+      const weeksBack = Math.min(Math.max(1, Number(args.weeks) || 4), 12);
+      const since = new Date(Date.now() - weeksBack * 7 * 86_400_000);
+
+      const activities = await prisma.activity.findMany({
+        where: { userId, startTime: { gte: since } },
+        orderBy: { startTime: "asc" },
+        select: { startTime: true, type: true, duration: true, distance: true, avgHeartRate: true, calories: true },
+      });
+
+      // Group by ISO week (Mon–Sun)
+      const weekMap = new Map<string, typeof activities>();
+      for (const a of activities) {
+        const d = a.startTime;
+        const dow = d.getUTCDay() === 0 ? 7 : d.getUTCDay();
+        const mondayMs = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) - (dow - 1) * 86_400_000;
+        const key = new Date(mondayMs).toISOString().split("T")[0];
+        if (!weekMap.has(key)) weekMap.set(key, []);
+        weekMap.get(key)!.push(a);
+      }
+
+      const weeks = Array.from(weekMap.entries())
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([monday, acts]) => {
+          const sunday = new Date(new Date(monday).getTime() + 6 * 86_400_000).toISOString().split("T")[0];
+          const byType: Record<string, number> = {};
+          for (const a of acts) {
+            byType[a.type] = (byType[a.type] ?? 0) + 1;
+          }
+          return {
+            week_start:       monday,
+            week_end:         sunday,
+            activity_count:   acts.length,
+            total_duration_min: Math.round(acts.reduce((s, a) => s + a.duration, 0) / 60),
+            total_distance_km:  Math.round(acts.reduce((s, a) => s + (a.distance ?? 0), 0) / 10) / 100,
+            by_type:          byType,
+            avg_hr_bpm: acts.filter((a) => a.avgHeartRate).length > 0
+              ? Math.round(acts.filter((a) => a.avgHeartRate).reduce((s, a) => s + a.avgHeartRate!, 0) / acts.filter((a) => a.avgHeartRate).length)
+              : null,
+          };
+        });
+
+      // Week-over-week trend (last 2 complete weeks)
+      const complete = weeks.slice(-2);
+      const trend = complete.length === 2 ? {
+        duration_change_pct:  complete[0].total_duration_min > 0
+          ? Math.round(((complete[1].total_duration_min - complete[0].total_duration_min) / complete[0].total_duration_min) * 100)
+          : null,
+        distance_change_pct: complete[0].total_distance_km > 0
+          ? Math.round(((complete[1].total_distance_km - complete[0].total_distance_km) / complete[0].total_distance_km) * 100)
+          : null,
+      } : null;
+
+      return {
+        period_weeks: weeksBack,
+        since:        since.toISOString().split("T")[0],
+        weeks,
+        trend,
+        overall: {
+          total_activities:   activities.length,
+          total_duration_min: Math.round(activities.reduce((s, a) => s + a.duration, 0) / 60),
+          total_distance_km:  Math.round(activities.reduce((s, a) => s + (a.distance ?? 0), 0) / 10) / 100,
+          avg_per_week:       weeks.length > 0
+            ? Math.round(activities.length / weeks.length * 10) / 10
+            : 0,
+        },
+      };
+    }
+
+    // ── Wellness tool implementations ────────────────────────────────────────
 
     case "get_wellness_today": {
       const whoopConn = await prisma.trackerConnection.findUnique({

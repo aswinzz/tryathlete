@@ -99,10 +99,12 @@ export default async function DashboardPage() {
     prisma.trackerConnection.findUnique({ where: { userId_provider: { userId, provider: "strava" } } }),
   ]);
 
-  // Today's WHOOP recovery (most recent record)
+  // Today's WHOOP recovery — only show if the record is actually from today
+  const utcToday = new Date();
+  const todayStart = new Date(Date.UTC(utcToday.getUTCFullYear(), utcToday.getUTCMonth(), utcToday.getUTCDate()));
   const todayRecovery = whoopConn
     ? await prisma.whoopRecovery.findFirst({
-        where: { userId },
+        where: { userId, date: { gte: todayStart } },
         orderBy: { date: "desc" },
         select: {
           date: true, recoveryScore: true, hrv: true, restingHR: true,

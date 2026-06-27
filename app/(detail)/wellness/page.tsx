@@ -79,7 +79,13 @@ export default async function WellnessPage() {
     take: 30,
   });
 
-  const today     = records[0] ?? null;
+  // Only label a record "Today" if its date is actually today (UTC)
+  const utcNow    = new Date();
+  const todayStart = new Date(Date.UTC(utcNow.getUTCFullYear(), utcNow.getUTCMonth(), utcNow.getUTCDate()));
+  const latest    = records[0] ?? null;
+  const isToday   = latest !== null && latest.date >= todayStart;
+  const today     = latest; // still show most recent — but label it correctly below
+
   const avgHRV    = records.filter((r) => r.hrv    !== null).map((r) => r.hrv!);
   const avgHR     = records.filter((r) => r.restingHR !== null).map((r) => r.restingHR!);
   const avgScores = records.filter((r) => r.recoveryScore !== null).map((r) => r.recoveryScore!);
@@ -113,12 +119,19 @@ export default async function WellnessPage() {
 
         {records.length > 0 && (
           <>
-            {/* Today's spotlight */}
+            {/* Most recent spotlight */}
             {today && (
               <section>
-                <p className="text-[10px] font-bold text-[var(--text-3)] uppercase tracking-widest mb-3">
-                  Today
-                </p>
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-[10px] font-bold text-[var(--text-3)] uppercase tracking-widest">
+                    {isToday ? "Today" : fmtDate(today.date)}
+                  </p>
+                  {!isToday && (
+                    <p className="text-[10px] text-[#FF9500]">
+                      Not synced today
+                    </p>
+                  )}
+                </div>
                 <TodayCard record={today} />
               </section>
             )}
