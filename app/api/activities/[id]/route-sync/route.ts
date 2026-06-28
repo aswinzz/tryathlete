@@ -6,8 +6,8 @@
  * migration never prevents the route from being saved.
  */
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getUserId } from "@/lib/getUser";
 import { getGarminClient, extractDetailsData, type GarminDetailsResponse } from "@/lib/garmin";
 
 async function fetchAndSaveHR(
@@ -39,22 +39,22 @@ export async function POST(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await auth();
-  if (!session?.user?.id) {
+  const userId = await getUserId(_req);
+  if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const { id } = await params;
 
   const activity = await prisma.activity.findFirst({
-    where: { id, userId: session.user.id },
+    where: { id, userId },
     select: { id: true, garminId: true, startTime: true, routePoints: true },
   });
 
   if (!activity) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (!activity.garminId) return NextResponse.json({ error: "No Garmin ID for this activity" }, { status: 400 });
 
-  const client = await getGarminClient(session.user.id);
+  const client = await getGarminClient(userId);
 
   // ── GPS: return cached immediately, only fetch if missing ─────────────────
   let routePoints: { lat: number; lon: number }[] | null = null;

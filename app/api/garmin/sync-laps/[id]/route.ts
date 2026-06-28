@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { getUserId } from "@/lib/getUser";
 import { getGarminClient } from "@/lib/garmin";
 import { getHRZone } from "@/lib/utils";
 
@@ -19,18 +19,18 @@ interface GarminLapsResponse {
 }
 
 export async function POST(
-  _req: Request,
+  _req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const session = await auth();
-  if (!session?.user?.id) {
+  const userId = await getUserId(_req);
+  if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const { id } = await params;
 
   const activity = await prisma.activity.findFirst({
-    where: { id, userId: session.user.id },
+    where: { id, userId },
     include: { _count: { select: { laps: true } } },
   });
 
@@ -47,7 +47,7 @@ export async function POST(
   }
 
   try {
-    const client = await getGarminClient(session.user.id);
+    const client = await getGarminClient(userId);
 
     // Try multiple Garmin endpoints for lap data
     let laps: GarminLap[] = [];
