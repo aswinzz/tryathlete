@@ -6,8 +6,8 @@
  * for one provider, it is automatically set to false for all others.
  */
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getUserId } from "@/lib/getUser";
 import { parseDataPrefs, DEFAULT_WHOOP_PREFS, DEFAULT_GARMIN_PREFS } from "@/lib/whoop";
 import { DEFAULT_STRAVA_PREFS } from "@/lib/strava";
 
@@ -21,13 +21,10 @@ export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ provider: string }> }
 ) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const userId = await getUserId(req);
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { provider } = await params;
-  const userId = session.user.id;
   const body: Partial<typeof DEFAULT_WHOOP_PREFS> = await req.json();
 
   const conn = await prisma.trackerConnection.findUnique({

@@ -1,13 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getUserId } from "@/lib/getUser";
 import { GarminConnect } from "garmin-connect";
 
 export async function POST(req: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const userId = await getUserId(req);
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { username, password } = await req.json();
   if (!username || !password) {
@@ -25,14 +23,14 @@ export async function POST(req: NextRequest) {
   // TODO: encrypt password at rest with AES-256-GCM before production
   // For now, store plaintext (Garmin has no OAuth for personal API access)
   await prisma.trackerConnection.upsert({
-    where: { userId_provider: { userId: session.user.id, provider: "garmin" } },
+    where: { userId_provider: { userId, provider: "garmin" } },
     update: {
       garminUsername: username,
       garminPassword: password,
       connectedAt: new Date(),
     },
     create: {
-      userId: session.user.id,
+      userId,
       provider: "garmin",
       garminUsername: username,
       garminPassword: password,
@@ -42,14 +40,12 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ success: true });
 }
 
-export async function DELETE() {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+export async function DELETE(req: NextRequest) {
+  const userId = await getUserId(req);
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   await prisma.trackerConnection.deleteMany({
-    where: { userId: session.user.id, provider: "garmin" },
+    where: { userId, provider: "garmin" },
   });
 
   return NextResponse.json({ success: true });

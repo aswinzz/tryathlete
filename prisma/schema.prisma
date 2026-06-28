@@ -71,6 +71,7 @@ model TrackerConnection {
   tokenExpiry    DateTime?
   garminUsername String?
   garminPassword String?   // encrypted
+  connected      Boolean   @default(true)
   connectedAt    DateTime  @default(now())
   lastSyncAt     DateTime?
   // JSON: {"syncActivities":true,"syncRecovery":true,"syncSleep":true}
