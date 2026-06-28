@@ -1,27 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getUserId } from "@/lib/getUser";
 
 type Ctx = { params: Promise<{ dayId: string }> };
 
-/** GET — list activities from the user that fall on the same calendar date as this plan day */
-export async function GET(_req: NextRequest, { params }: Ctx) {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+/** GET — activities from this user that fall on the same calendar date as this plan day */
+export async function GET(req: NextRequest, { params }: Ctx) {
+  const userId = await getUserId(req);
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { dayId } = await params;
-  const userId = session.user.id;
 
   const day = await prisma.workoutDay.findFirst({
     where: { id: dayId },
-    include: {
-      week: {
-        include: { plan: { select: { startDate: true, userId: true } } },
-      },
-    },
+    include: { week: { include: { plan: { select: { startDate: true, userId: true } } } } },
   });
 
-  // Verify ownership
-  if (!day || day.week.plan?.userId !== userId || !day.week.plan?.startDate) return NextResponse.json([]);
+  if (!day || day.week.plan?.userId !== userId || !day.week.plan?.startDate)
+    return NextResponse.json([]);
 
   const startDate = new Date(day.week.plan.startDate);
   startDate.setUTCHours(0, 0, 0, 0);

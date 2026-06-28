@@ -5,11 +5,25 @@ import { DayType, DayStatus } from "@/lib/planEnums";
 
 type Ctx = { params: Promise<{ id: string; weekId: string; dayId: string }> };
 
+const ACTIVITY_SELECT = {
+  id: true, name: true, type: true, startTime: true,
+  distance: true, duration: true, avgPace: true,
+  avgHeartRate: true, calories: true,
+} as const;
+
 async function ownedDay(userId: string, planId: string, weekId: string, dayId: string) {
   const day = await prisma.workoutDay.findFirst({
     where: { id: dayId, weekId },
     include: {
-      entries: { orderBy: { orderIndex: "asc" } },
+      entries: {
+        orderBy: { orderIndex: "asc" },
+        include: {
+          links: {
+            where: { status: { not: "REJECTED" } },
+            include: { activity: { select: ACTIVITY_SELECT } },
+          },
+        },
+      },
       week: { include: { plan: { select: { userId: true, id: true } } } },
     },
   });

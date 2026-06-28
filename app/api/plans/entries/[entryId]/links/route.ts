@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getUserId } from "@/lib/getUser";
 
 type Ctx = { params: Promise<{ entryId: string }> };
 
@@ -14,10 +14,10 @@ async function ownedEntry(userId: string, entryId: string) {
 
 /** GET — list all links for an entry (with activity data) */
 export async function GET(_req: NextRequest, { params }: Ctx) {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getUserId(_req);
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { entryId } = await params;
-  if (!(await ownedEntry(session.user.id, entryId)))
+  if (!(await ownedEntry(userId, entryId)))
     return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const links = await prisma.planActivityLink.findMany({
@@ -38,30 +38,27 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
 
 /** POST — manually link an activity to an entry */
 export async function POST(req: NextRequest, { params }: Ctx) {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getUserId(req);
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { entryId } = await params;
 
-  const entry = await ownedEntry(session.user.id, entryId);
+  const entry = await ownedEntry(userId, entryId);
   if (!entry) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const { activityId } = await req.json();
   if (!activityId) return NextResponse.json({ error: "activityId required" }, { status: 400 });
 
-  // Verify the activity belongs to this user
-  const activity = await prisma.activity.findFirst({
-    where: { id: activityId, userId: session.user.id },
-  });
+  const activity = await prisma.activity.findFirst({ where: { id: activityId, userId } });
   if (!activity) return NextResponse.json({ error: "Activity not found" }, { status: 404 });
 
   const link = await prisma.planActivityLink.upsert({
     where: { entryId_activityId: { entryId, activityId } },
     update: { status: "MANUAL", confidence: 1.0 },
     create: { entryId, activityId, confidence: 1.0, status: "MANUAL" },
-    include: { activity: { select: { id: true, name: true, type: true, startTime: true, distance: true, duration: true, avgPace: true } } },
+    include: { activity: { select: { id: true, name: true, type: true, startTime: true, distance: true, duration: true, avgPace: true, avgHeartRate: true, calories: true } } },
   });
 
-  // Check day completion
+  // Auto-complete day if all entries now have confirmed links
   const dayId = entry.dayId;
   const allEntries = await prisma.workoutEntry.findMany({
     where: { dayId },

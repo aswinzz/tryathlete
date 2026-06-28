@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getUserId } from "@/lib/getUser";
 import { EntryType } from "@/lib/planEnums";
 
 type Ctx = { params: Promise<{ id: string; weekId: string; dayId: string; entryId: string }> };
@@ -8,19 +8,17 @@ type Ctx = { params: Promise<{ id: string; weekId: string; dayId: string; entryI
 async function ownedEntry(userId: string, planId: string, dayId: string, entryId: string) {
   const entry = await prisma.workoutEntry.findFirst({
     where: { id: entryId, dayId },
-    include: {
-      day: { include: { week: { include: { plan: { select: { userId: true, id: true } } } } } },
-    },
+    include: { day: { include: { week: { include: { plan: { select: { userId: true, id: true } } } } } } },
   });
   return entry?.day.week.plan.userId === userId && entry.day.week.plan.id === planId ? entry : null;
 }
 
 export async function PATCH(req: NextRequest, { params }: Ctx) {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getUserId(req);
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id, dayId, entryId } = await params;
 
-  if (!(await ownedEntry(session.user.id, id, dayId, entryId)))
+  if (!(await ownedEntry(userId, id, dayId, entryId)))
     return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const body = await req.json();
@@ -35,12 +33,12 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   return NextResponse.json(updated);
 }
 
-export async function DELETE(_req: NextRequest, { params }: Ctx) {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export async function DELETE(req: NextRequest, { params }: Ctx) {
+  const userId = await getUserId(req);
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id, dayId, entryId } = await params;
 
-  if (!(await ownedEntry(session.user.id, id, dayId, entryId)))
+  if (!(await ownedEntry(userId, id, dayId, entryId)))
     return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   await prisma.workoutEntry.delete({ where: { id: entryId } });

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getUserId } from "@/lib/getUser";
 import { EntryType } from "@/lib/planEnums";
 
 type Ctx = { params: Promise<{ id: string; weekId: string; dayId: string }> };
@@ -13,12 +13,12 @@ async function ownedDay(userId: string, planId: string, weekId: string, dayId: s
   return day?.week.plan.userId === userId && day.week.plan.id === planId ? day : null;
 }
 
-export async function GET(_req: NextRequest, { params }: Ctx) {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export async function GET(req: NextRequest, { params }: Ctx) {
+  const userId = await getUserId(req);
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id, weekId, dayId } = await params;
 
-  if (!(await ownedDay(session.user.id, id, weekId, dayId)))
+  if (!(await ownedDay(userId, id, weekId, dayId)))
     return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const entries = await prisma.workoutEntry.findMany({
@@ -43,19 +43,17 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
 }
 
 export async function POST(req: NextRequest, { params }: Ctx) {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getUserId(req);
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id, weekId, dayId } = await params;
 
-  if (!(await ownedDay(session.user.id, id, weekId, dayId)))
+  if (!(await ownedDay(userId, id, weekId, dayId)))
     return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const body = await req.json();
   const { type, title, description, durationMin, orderIndex } = body;
-
   if (!title?.trim()) return NextResponse.json({ error: "Title is required" }, { status: 400 });
 
-  // Auto-assign orderIndex if not provided
   let order = orderIndex;
   if (order === undefined) {
     const count = await prisma.workoutEntry.count({ where: { dayId } });
@@ -72,6 +70,5 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       orderIndex: Number(order),
     },
   });
-
   return NextResponse.json(entry, { status: 201 });
 }
