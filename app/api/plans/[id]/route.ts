@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getUserId } from "@/lib/getUser";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -8,13 +8,13 @@ async function ownedPlan(userId: string, id: string) {
   return prisma.workoutPlan.findFirst({ where: { id, userId } });
 }
 
-export async function GET(_req: NextRequest, { params }: Ctx) {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export async function GET(req: NextRequest, { params }: Ctx) {
+  const userId = await getUserId(req);
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
 
   const plan = await prisma.workoutPlan.findFirst({
-    where: { id, userId: session.user.id },
+    where: { id, userId },
     include: {
       weeks: {
         orderBy: { weekNumber: "asc" },
@@ -33,11 +33,11 @@ export async function GET(_req: NextRequest, { params }: Ctx) {
 }
 
 export async function PATCH(req: NextRequest, { params }: Ctx) {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getUserId(req);
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
 
-  if (!(await ownedPlan(session.user.id, id)))
+  if (!(await ownedPlan(userId, id)))
     return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const body = await req.json();
@@ -53,12 +53,12 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   return NextResponse.json(updated);
 }
 
-export async function DELETE(_req: NextRequest, { params }: Ctx) {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export async function DELETE(req: NextRequest, { params }: Ctx) {
+  const userId = await getUserId(req);
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
 
-  if (!(await ownedPlan(session.user.id, id)))
+  if (!(await ownedPlan(userId, id)))
     return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   await prisma.workoutPlan.delete({ where: { id } });

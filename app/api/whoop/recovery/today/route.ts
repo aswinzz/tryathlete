@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyMobileToken } from "@/lib/mobileAuth";
+import { getUserId } from "@/lib/getUser";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
-  const userId = await verifyMobileToken(req);
+  const userId = await getUserId(req);
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  // "today" = the most recent recovery record
   const record = await prisma.whoopRecovery.findFirst({
     where: { userId },
     orderBy: { date: "desc" },
