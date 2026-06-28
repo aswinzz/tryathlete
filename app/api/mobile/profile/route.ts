@@ -65,7 +65,7 @@ export async function GET(req: NextRequest) {
   const connections = user.connections.map((c) => ({
     id: c.provider,
     service: c.provider,
-    isConnected: true, // all stored rows are active connections (pre-migration: no connected column yet)
+    connected: true, // Swift CodingKey decodes from "connected" key; all rows are active pre-migration
     lastSyncAt: c.lastSyncAt?.toISOString() ?? null,
   }));
 
