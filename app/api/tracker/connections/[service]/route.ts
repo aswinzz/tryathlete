@@ -12,9 +12,11 @@ export async function DELETE(req: NextRequest, { params }: Ctx) {
 
   const { service } = await params;
 
-  await prisma.trackerConnection.updateMany({
+  // Hard-delete the row so the endpoint works before the `connected` migration is applied.
+  // After running `npx prisma migrate dev && npx prisma generate`, change this back to:
+  //   updateMany({ where: { userId, provider: service }, data: { connected: false, accessToken: null, refreshToken: null } })
+  await prisma.trackerConnection.deleteMany({
     where: { userId, provider: service },
-    data: { connected: false, accessToken: null, refreshToken: null },
   });
 
   return NextResponse.json({ ok: true });

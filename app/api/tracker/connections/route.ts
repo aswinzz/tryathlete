@@ -18,13 +18,13 @@ export async function GET(req: NextRequest) {
 
   const rows = await prisma.trackerConnection.findMany({
     where: { userId },
-    select: { provider: true, connected: true, lastSyncAt: true, dataPrefs: true },
+    select: { provider: true, lastSyncAt: true, dataPrefs: true },
   });
 
   const connections = rows.map((c) => ({
     id: c.provider,
     service: c.provider,
-    connected: c.connected,
+    connected: true, // all stored rows are active connections (pre-migration: no connected column yet)
     lastSyncAt: c.lastSyncAt?.toISOString() ?? null,
     prefs: parseDataPrefs(c.dataPrefs, PREF_DEFAULTS[c.provider] ?? DEFAULT_WHOOP_PREFS),
   }));

@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
     where: { id: userId },
     include: {
       activities: { select: { type: true, distance: true, duration: true, startTime: true } },
-      connections: { select: { provider: true, connected: true, lastSyncAt: true } },
+      connections: { select: { provider: true, lastSyncAt: true } },
     },
   });
   if (!user) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -65,7 +65,7 @@ export async function GET(req: NextRequest) {
   const connections = user.connections.map((c) => ({
     id: c.provider,
     service: c.provider,
-    isConnected: c.connected,
+    isConnected: true, // all stored rows are active connections (pre-migration: no connected column yet)
     lastSyncAt: c.lastSyncAt?.toISOString() ?? null,
   }));
 
