@@ -8,8 +8,11 @@ import { verifyMobileToken } from "@/lib/mobileAuth";
  * serves both clients without duplication.
  */
 export async function getUserId(req: NextRequest): Promise<string | null> {
+  // Mobile clients send JWT via Authorization: Bearer or X-App-Token (fallback
+  // for proxies that strip the Authorization header).
   const authHeader = req.headers.get("authorization");
-  if (authHeader?.startsWith("Bearer ")) {
+  const customHeader = req.headers.get("x-app-token");
+  if (authHeader?.startsWith("Bearer ") || customHeader) {
     return verifyMobileToken(req);
   }
   const session = await auth();

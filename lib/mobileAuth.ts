@@ -16,9 +16,24 @@ export async function signMobileToken(userId: string): Promise<string> {
     .sign(SECRET);
 }
 
+/**
+ * Extracts the raw JWT string from the request.
+ * Checks two places in order:
+ *  1. "Authorization: Bearer <token>" header (standard)
+ *  2. "X-App-Token: <token>" header (fallback for proxies that strip Authorization)
+ */
+function extractToken(req: NextRequest): string | null {
+  const authHeader = req.headers.get("authorization") ?? "";
+  if (authHeader.startsWith("Bearer ")) return authHeader.slice(7);
+
+  const customHeader = req.headers.get("x-app-token");
+  if (customHeader) return customHeader;
+
+  return null;
+}
+
 export async function verifyMobileToken(req: NextRequest): Promise<string | null> {
-  const auth = req.headers.get("authorization") ?? "";
-  const token = auth.startsWith("Bearer ") ? auth.slice(7) : null;
+  const token = extractToken(req);
   if (!token) return null;
   try {
     const { payload } = await jwtVerify(token, SECRET, { algorithms: [ALG] });
@@ -29,7 +44,7 @@ export async function verifyMobileToken(req: NextRequest): Promise<string | null
       : process.env.NEXTAUTH_SECRET
       ? "NEXTAUTH_SECRET"
       : "fallback";
-    console.error("[mobileAuth] verify failed:", (err as Error).message, "| secret:", secretSource, "| tokenLen:", token.length);
+    console.error("[mobileAuth] verify failed:", (err as Error).message, "| secret:", secretSource);
     return null;
   }
 }
