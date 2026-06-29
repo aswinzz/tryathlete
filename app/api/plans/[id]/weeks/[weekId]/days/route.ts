@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
+import { getUserId } from "@/lib/getUser";
 import { prisma } from "@/lib/prisma";
 import { DayType, DayStatus } from "@/lib/planEnums";
 
@@ -14,11 +14,11 @@ async function ownedWeek(userId: string, planId: string, weekId: string) {
 }
 
 export async function POST(req: NextRequest, { params }: Ctx) {
-  const session = await auth();
-  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await getUserId(req);
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id, weekId } = await params;
 
-  if (!(await ownedWeek(session.user.id, id, weekId)))
+  if (!(await ownedWeek(userId, id, weekId)))
     return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const body = await req.json();

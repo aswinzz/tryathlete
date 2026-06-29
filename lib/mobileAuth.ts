@@ -23,7 +23,13 @@ export async function verifyMobileToken(req: NextRequest): Promise<string | null
   try {
     const { payload } = await jwtVerify(token, SECRET, { algorithms: [ALG] });
     return (payload.sub as string) ?? null;
-  } catch {
+  } catch (err) {
+    const secretSource = process.env.MOBILE_JWT_SECRET
+      ? "MOBILE_JWT_SECRET"
+      : process.env.NEXTAUTH_SECRET
+      ? "NEXTAUTH_SECRET"
+      : "fallback";
+    console.error("[mobileAuth] verify failed:", (err as Error).message, "| secret:", secretSource, "| tokenLen:", token.length);
     return null;
   }
 }
