@@ -14,10 +14,17 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  // Decode userId from state
+  // Decode userId (and optional :mobile flag) from state
   let userId: string;
+  let isMobile = false;
   try {
-    userId = Buffer.from(state, "base64url").toString();
+    const decoded = Buffer.from(state, "base64url").toString();
+    if (decoded.endsWith(":mobile")) {
+      isMobile = true;
+      userId = decoded.slice(0, -":mobile".length);
+    } else {
+      userId = decoded;
+    }
   } catch {
     return NextResponse.redirect(new URL("/settings?whoop=error", process.env.NEXTAUTH_URL!));
   }
@@ -57,5 +64,9 @@ export async function GET(req: NextRequest) {
     headers: { Cookie: req.headers.get("cookie") ?? "" },
   }).catch(() => {});
 
+  // For mobile: redirect back to the iOS app via deep link
+  if (isMobile) {
+    return NextResponse.redirect("tryathlete://oauth/callback?service=whoop&status=connected");
+  }
   return NextResponse.redirect(new URL("/settings?whoop=connected", process.env.NEXTAUTH_URL!));
 }
