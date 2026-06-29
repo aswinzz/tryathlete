@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { exchangeWhoopCode, DEFAULT_WHOOP_PREFS } from "@/lib/whoop";
+import { exchangeWhoopCode, DEFAULT_WHOOP_PREFS, syncWhoopData } from "@/lib/whoop";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
@@ -58,11 +58,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(new URL("/settings?whoop=error", process.env.NEXTAUTH_URL!));
   }
 
-  // Kick off initial sync in background (fire and forget)
-  fetch(`${process.env.NEXTAUTH_URL}/api/whoop/sync`, {
-    method: "POST",
-    headers: { Cookie: req.headers.get("cookie") ?? "" },
-  }).catch(() => {});
+  // Kick off initial sync in background (fire and forget).
+  // Call directly — no HTTP round-trip needed, and avoids auth header issues in mobile flow.
+  syncWhoopData(userId).catch(() => {});
 
   // For mobile: redirect back to the iOS app via deep link
   if (isMobile) {
