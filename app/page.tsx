@@ -37,13 +37,13 @@ export default function LandingPage() {
         </h1>
 
         <p className="text-lg md:text-xl text-[#888] max-w-2xl mx-auto mb-10 leading-relaxed">
-          TryAthlete is not another AI training app — it&apos;s the data layer that
-          connects Strava, WHOOP, and Garmin to ChatGPT or Claude.
+          TryAthlete is not another AI training app. It is the data layer that
+          connects Strava, WHOOP, and Garmin to ChatGPT or Claude so it can actually coach you.
         </p>
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
           <span className="bg-[#c8ff00] text-[#0a0a0a] font-bold px-8 py-4 rounded-xl text-base opacity-40 cursor-not-allowed select-none w-full sm:w-auto">
-            Currently Invite Only
+            Invite Only
           </span>
           <a
             href="#how"
@@ -119,7 +119,7 @@ export default function LandingPage() {
               {
                 num: "03",
                 title: "Ask your AI anything",
-                desc: "Open ChatGPT or Claude. Paste your TryAthlete summary and get advice based on YOUR actual data — not guesses.",
+                desc: "Open ChatGPT or Claude. Your AI can now see your full training plan, how sessions are going, recovery trends, and what is coming up next.",
               },
             ].map((s) => (
               <div key={s.num} className="bg-[#111] border border-white/6 rounded-2xl p-6">
@@ -186,7 +186,7 @@ export default function LandingPage() {
               {
                 icon: "📋",
                 title: "Training plan management",
-                desc: "Build multi-week structured plans with workouts, targets, zones, and notes — all visible to your AI.",
+                desc: "Build multi-week structured plans with workouts, targets, zones, and notes. Your AI can see the full plan and how each session went.",
               },
               {
                 icon: "⚡",
@@ -200,8 +200,8 @@ export default function LandingPage() {
               },
               {
                 icon: "🤖",
-                title: "AI-ready data export",
-                desc: "One-tap context snapshot formatted perfectly for ChatGPT or Claude to understand immediately.",
+                title: "Full plan visibility for your AI",
+                desc: "Your AI gets access to your entire training plan, session history, recovery scores, and upcoming workouts. Not a summary. The whole picture.",
               },
             ].map((f) => (
               <div key={f.title} className="bg-[#111] border border-white/6 rounded-2xl p-6 flex gap-4">
@@ -247,7 +247,7 @@ export default function LandingPage() {
             />
             <span className="text-[#555] text-sm">The training data layer for your AI.</span>
           </div>
-          <p className="text-[#555] text-sm">© 2024 TryAthlete · iOS Invite Only Beta</p>
+          <p className="text-[#555] text-sm">© 2026 TryAthlete · iOS Invite Only Beta</p>
         </div>
       </footer>
     </div>
