@@ -11,9 +11,11 @@ export default async function TabsLayout({
   if (!session) redirect("/auth/signin");
 
   return (
-    <div className="flex flex-col min-h-dvh">
-      <main className="flex-1 pb-20">{children}</main>
-      <BottomNav />
+    <div className="app-container">
+      <div className="flex flex-col min-h-dvh">
+        <main className="flex-1 pb-20">{children}</main>
+        <BottomNav />
+      </div>
     </div>
   );
 }

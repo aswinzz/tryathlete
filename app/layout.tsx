@@ -3,9 +3,9 @@ import NextTopLoader from "nextjs-toploader";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "TryAthlete — Make every workout instagrammable",
+  title: "TryAthlete — The training data layer for your AI",
   description:
-    "Connect Garmin, track your runs, and share beautiful receipt-style workout cards.",
+    "Not another AI app. TryAthlete connects Strava, WHOOP, and Garmin to ChatGPT or Claude — giving your AI real training data to work with.",
 };
 
 export const viewport: Viewport = {
@@ -29,7 +29,7 @@ export default function RootLayout({
           showSpinner={false}
           shadow="0 0 8px #c8ff00"
         />
-        <div className="app-container">{children}</div>
+        {children}
       </body>
     </html>
   );

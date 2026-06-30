@@ -10,8 +10,10 @@ export default async function DetailLayout({
   if (!session) redirect("/auth/signin");
 
   return (
-    <div className="flex flex-col min-h-dvh">
-      <main className="flex-1">{children}</main>
+    <div className="app-container">
+      <div className="flex flex-col min-h-dvh">
+        <main className="flex-1">{children}</main>
+      </div>
     </div>
   );
 }
