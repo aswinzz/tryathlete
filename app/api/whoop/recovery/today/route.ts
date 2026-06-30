@@ -8,21 +8,19 @@ export async function GET(req: NextRequest) {
   const userId = await getUserId(req);
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  // The WHOOP date field is stored as midnight UTC of the date string WHOOP sends,
-  // which reflects the user's local timezone — not the server's UTC clock. A user
-  // in UTC+14 will have today's record stored as "tomorrow" in UTC, and a user in
-  // UTC-12 will have it stored as "yesterday" in UTC. We use a ±2-day window
-  // (48 hours back, 48 hours forward) to cover every possible timezone offset,
-  // then let the mobile client's Calendar.isDateInToday() make the final call using
-  // the user's actual device timezone.
-  const now = new Date();
-  const windowStart = new Date(now.getTime() - 48 * 60 * 60 * 1000);
-  const windowEnd   = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+  // WHOOP's `date` field is the timestamp when the sleep/recovery cycle *began*,
+  // not a calendar date for the day the user woke up. A user who slept at 23:00
+  // local time will have a recovery record whose `date` falls on the previous
+  // calendar day. Checking "is this date == today?" therefore always fails for
+  // nighttime sleepers. Instead we check recency: if the most recent record is
+  // within the last 36 hours it is today's recovery data (a full sleep cycle is
+  // at most ~12h, so 36h gives comfortable headroom without surfacing old data).
+  const cutoff = new Date(Date.now() - 36 * 60 * 60 * 1000);
 
   const record = await prisma.whoopRecovery.findFirst({
     where: {
       userId,
-      date: { gte: windowStart, lt: windowEnd },
+      date: { gte: cutoff },
     },
     orderBy: { date: "desc" },
     select: {
