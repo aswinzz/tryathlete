@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { exchangeWhoopCode, DEFAULT_WHOOP_PREFS, syncWhoopData } from "@/lib/whoop";
+import { captureServerEvent } from "@/lib/posthog";
+import * as Sentry from "@sentry/nextjs";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
@@ -53,8 +55,14 @@ export async function GET(req: NextRequest) {
         dataPrefs:    JSON.stringify(DEFAULT_WHOOP_PREFS),
       },
     });
+
+    captureServerEvent(userId, "tracker_connected", {
+      provider: "whoop",
+      platform: isMobile ? "ios" : "web",
+    });
   } catch (err) {
     console.error("WHOOP callback error:", err);
+    Sentry.captureException(err, { tags: { route: "whoop.callback" } });
     return NextResponse.redirect(new URL("/settings?whoop=error", process.env.NEXTAUTH_URL!));
   }
 

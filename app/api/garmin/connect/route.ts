@@ -3,8 +3,10 @@ import { prisma } from "@/lib/prisma";
 import { getUserId } from "@/lib/getUser";
 import { GarminConnect } from "garmin-connect";
 import { encrypt } from "@/lib/encryption";
+import { captureServerEvent } from "@/lib/posthog";
+import { withApiHandler } from "@/lib/apiError";
 
-export async function POST(req: NextRequest) {
+export const POST = withApiHandler(async (req: NextRequest) => {
   const userId = await getUserId(req);
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -18,7 +20,7 @@ export async function POST(req: NextRequest) {
     const client = new GarminConnect({ username, password });
     await client.login(username, password);
   } catch {
-    return NextResponse.json({ error: "Invalid Garmin credentials — check your email and password" }, { status: 401 });
+    return NextResponse.json({ error: "Invalid Garmin credentials. Check your email and password." }, { status: 401 });
   }
 
   const encryptedPassword = encrypt(password);
@@ -37,10 +39,12 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  return NextResponse.json({ success: true });
-}
+  captureServerEvent(userId, "tracker_connected", { provider: "garmin", platform: "ios" });
 
-export async function DELETE(req: NextRequest) {
+  return NextResponse.json({ success: true });
+}, "garmin.connect");
+
+export const DELETE = withApiHandler(async (req: NextRequest) => {
   const userId = await getUserId(req);
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -49,4 +53,4 @@ export async function DELETE(req: NextRequest) {
   });
 
   return NextResponse.json({ success: true });
-}
+}, "garmin.disconnect");

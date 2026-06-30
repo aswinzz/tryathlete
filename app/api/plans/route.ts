@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getUserId } from "@/lib/getUser";
+import { captureServerEvent } from "@/lib/posthog";
+import { withApiHandler } from "@/lib/apiError";
 
-export async function GET(req: NextRequest) {
+export const GET = withApiHandler(async (req: NextRequest) => {
   const userId = await getUserId(req);
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -23,9 +25,9 @@ export async function GET(req: NextRequest) {
   });
 
   return NextResponse.json(plans);
-}
+}, "plans.list");
 
-export async function POST(req: NextRequest) {
+export const POST = withApiHandler(async (req: NextRequest) => {
   const userId = await getUserId(req);
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
@@ -45,5 +47,7 @@ export async function POST(req: NextRequest) {
     },
   });
 
+  captureServerEvent(userId, "plan_created", { planId: plan.id, title: plan.title });
+
   return NextResponse.json(plan, { status: 201 });
-}
+}, "plans.create");

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { exchangeStravaCode, DEFAULT_STRAVA_PREFS } from "@/lib/strava";
+import { captureServerEvent } from "@/lib/posthog";
+import * as Sentry from "@sentry/nextjs";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = req.nextUrl;
@@ -66,8 +68,14 @@ export async function GET(req: NextRequest) {
         dataPrefs:   JSON.stringify(prefs),
       },
     });
+
+    captureServerEvent(userId, "tracker_connected", {
+      provider: "strava",
+      platform: isMobile ? "ios" : "web",
+    });
   } catch (err) {
     console.error("Strava callback error:", err);
+    Sentry.captureException(err, { tags: { route: "strava.callback" } });
     return NextResponse.redirect(new URL("/settings?strava=error", process.env.NEXTAUTH_URL!));
   }
 

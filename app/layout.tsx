@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import NextTopLoader from "nextjs-toploader";
+import { PostHogProvider } from "@/components/providers/PostHogProvider";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -23,13 +24,15 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <NextTopLoader
-          color="#c8ff00"
-          height={2}
-          showSpinner={false}
-          shadow="0 0 8px #c8ff00"
-        />
-        {children}
+        <PostHogProvider>
+          <NextTopLoader
+            color="#c8ff00"
+            height={2}
+            showSpinner={false}
+            shadow="0 0 8px #c8ff00"
+          />
+          {children}
+        </PostHogProvider>
       </body>
     </html>
   );
