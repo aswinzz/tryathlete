@@ -8,8 +8,18 @@ export async function GET(req: NextRequest) {
   const userId = await getUserId(req);
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  // Build a UTC [startOfToday, startOfTomorrow) window so we only return
+  // a record whose date field falls on today — never yesterday's stale data.
+  const now = new Date();
+  const startOfToday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const startOfTomorrow = new Date(startOfToday);
+  startOfTomorrow.setUTCDate(startOfTomorrow.getUTCDate() + 1);
+
   const record = await prisma.whoopRecovery.findFirst({
-    where: { userId },
+    where: {
+      userId,
+      date: { gte: startOfToday, lt: startOfTomorrow },
+    },
     orderBy: { date: "desc" },
     select: {
       id: true, date: true,
