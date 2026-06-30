@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getUserId } from "@/lib/getUser";
+import { captureServerEvent } from "@/lib/posthog";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -50,6 +51,11 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   if (body.isDraft !== undefined) data.isDraft = Boolean(body.isDraft);
 
   const updated = await prisma.workoutPlan.update({ where: { id }, data });
+
+  if (data.isActive === true) {
+    captureServerEvent(userId, "plan_activated", { planId: id, title: updated.title });
+  }
+
   return NextResponse.json(updated);
 }
 
