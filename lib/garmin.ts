@@ -3,6 +3,7 @@ import { prisma } from "./prisma";
 import { downsample } from "./routeUtils";
 import { reconcileActivity } from "./planReconciler";
 import { getHRZone } from "./utils";
+import { decrypt } from "./encryption";
 
 /**
  * Parse a Garmin time string (e.g. "2024-03-15 07:30:00") as UTC.
@@ -25,13 +26,12 @@ export async function getGarminClient(userId: string) {
     throw new Error("Garmin not connected");
   }
 
-  // Note: garminPassword stored as plain text at connect time after verification
-  // In production use proper encryption (e.g. aes-256-gcm with a KMS key)
+  const password = decrypt(conn.garminPassword);
   const client = new GarminConnect({
     username: conn.garminUsername,
-    password: conn.garminPassword,
+    password,
   });
-  await client.login(conn.garminUsername, conn.garminPassword);
+  await client.login(conn.garminUsername, password);
   return client;
 }
 

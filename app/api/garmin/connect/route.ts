@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getUserId } from "@/lib/getUser";
 import { GarminConnect } from "garmin-connect";
+import { encrypt } from "@/lib/encryption";
 
 export async function POST(req: NextRequest) {
   const userId = await getUserId(req);
@@ -20,20 +21,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid Garmin credentials — check your email and password" }, { status: 401 });
   }
 
-  // TODO: encrypt password at rest with AES-256-GCM before production
-  // For now, store plaintext (Garmin has no OAuth for personal API access)
+  const encryptedPassword = encrypt(password);
   await prisma.trackerConnection.upsert({
     where: { userId_provider: { userId, provider: "garmin" } },
     update: {
       garminUsername: username,
-      garminPassword: password,
+      garminPassword: encryptedPassword,
       connectedAt: new Date(),
     },
     create: {
       userId,
       provider: "garmin",
       garminUsername: username,
-      garminPassword: password,
+      garminPassword: encryptedPassword,
     },
   });
 
