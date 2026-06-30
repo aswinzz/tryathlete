@@ -8,17 +8,21 @@ export async function GET(req: NextRequest) {
   const userId = await getUserId(req);
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  // Build a UTC [startOfToday, startOfTomorrow) window so we only return
-  // a record whose date field falls on today — never yesterday's stale data.
+  // The WHOOP date field is stored as midnight UTC of the date string WHOOP sends,
+  // which reflects the user's local timezone — not the server's UTC clock. A user
+  // in UTC+14 will have today's record stored as "tomorrow" in UTC, and a user in
+  // UTC-12 will have it stored as "yesterday" in UTC. We use a ±2-day window
+  // (48 hours back, 48 hours forward) to cover every possible timezone offset,
+  // then let the mobile client's Calendar.isDateInToday() make the final call using
+  // the user's actual device timezone.
   const now = new Date();
-  const startOfToday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-  const startOfTomorrow = new Date(startOfToday);
-  startOfTomorrow.setUTCDate(startOfTomorrow.getUTCDate() + 1);
+  const windowStart = new Date(now.getTime() - 48 * 60 * 60 * 1000);
+  const windowEnd   = new Date(now.getTime() + 48 * 60 * 60 * 1000);
 
   const record = await prisma.whoopRecovery.findFirst({
     where: {
       userId,
-      date: { gte: startOfToday, lt: startOfTomorrow },
+      date: { gte: windowStart, lt: windowEnd },
     },
     orderBy: { date: "desc" },
     select: {
