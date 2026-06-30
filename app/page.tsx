@@ -1,4 +1,3 @@
-import Link from "next/link";
 import Image from "next/image";
 
 export default function LandingPage() {
@@ -19,18 +18,14 @@ export default function LandingPage() {
             <a href="#how" className="hover:text-white transition-colors">How it works</a>
             <a href="#features" className="hover:text-white transition-colors">Features</a>
           </div>
-          <Link
-            href="/auth/signup"
-            className="bg-[#c8ff00] text-[#0a0a0a] text-sm font-bold px-5 py-2.5 rounded-lg hover:bg-[#d4ff33] transition-colors"
-          >
-            Request Invite
-          </Link>
+          <span className="bg-[#c8ff00]/10 text-[#c8ff00] text-xs font-bold px-4 py-2 rounded-lg border border-[#c8ff00]/20">
+            Invite Only
+          </span>
         </div>
       </nav>
 
       {/* ── HERO ─────────────────────────────────────────── */}
       <section className="max-w-6xl mx-auto px-6 pt-24 pb-20 text-center">
-        {/* Badge */}
         <div className="inline-flex items-center gap-2 bg-[#c8ff00]/10 border border-[#c8ff00]/20 text-[#c8ff00] text-xs font-bold px-4 py-2 rounded-full mb-10 tracking-widest uppercase">
           ✦ Not another AI app ✦
         </div>
@@ -47,12 +42,9 @@ export default function LandingPage() {
         </p>
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
-          <Link
-            href="/auth/signup"
-            className="bg-[#c8ff00] text-[#0a0a0a] font-bold px-8 py-4 rounded-xl text-base hover:bg-[#d4ff33] transition-colors w-full sm:w-auto"
-          >
-            Request Invite →
-          </Link>
+          <span className="bg-[#c8ff00] text-[#0a0a0a] font-bold px-8 py-4 rounded-xl text-base opacity-40 cursor-not-allowed select-none w-full sm:w-auto">
+            Currently Invite Only
+          </span>
           <a
             href="#how"
             className="bg-white/6 text-white font-medium px-8 py-4 rounded-xl text-base hover:bg-white/10 transition-colors w-full sm:w-auto border border-white/10"
@@ -149,7 +141,6 @@ export default function LandingPage() {
           </h2>
 
           <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-6">
-            {/* Wearables */}
             <div className="flex gap-3">
               {["Strava", "WHOOP", "Garmin"].map((w) => (
                 <div key={w} className="bg-[#111] border border-white/6 rounded-xl px-5 py-4 text-center min-w-[100px]">
@@ -158,19 +149,15 @@ export default function LandingPage() {
               ))}
             </div>
 
-            {/* Arrow */}
             <div className="text-[#c8ff00] text-3xl font-black rotate-90 md:rotate-0">→</div>
 
-            {/* TryAthlete badge */}
             <div className="bg-[#c8ff00]/10 border border-[#c8ff00]/30 rounded-xl px-6 py-4 text-center">
               <p className="font-black text-[#c8ff00] text-sm">TryAthlete</p>
               <p className="text-[#888] text-xs mt-0.5">data layer</p>
             </div>
 
-            {/* Arrow */}
             <div className="text-[#c8ff00] text-3xl font-black rotate-90 md:rotate-0">→</div>
 
-            {/* AI tools */}
             <div className="flex gap-3">
               {["ChatGPT", "Claude"].map((a) => (
                 <div key={a} className="bg-[#c8ff00]/10 border border-[#c8ff00]/20 rounded-xl px-5 py-4 text-center min-w-[100px]">
@@ -229,7 +216,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ── CTA ──────────────────────────────────────────── */}
+      {/* ── CLOSING ──────────────────────────────────────── */}
       <section className="border-t border-white/6 py-24">
         <div className="max-w-2xl mx-auto px-6 text-center">
           <div className="bg-[#111] border border-white/6 rounded-3xl p-10 md:p-16">
@@ -239,15 +226,10 @@ export default function LandingPage() {
               <br />
               Give it real training data.
             </h2>
-            <p className="text-[#888] mb-8 leading-relaxed">
-              Request early access and be first to connect your wearables to your favourite AI.
+            <p className="text-[#888] leading-relaxed">
+              Currently available by invite only. If you train with data and use AI,
+              this is built for you.
             </p>
-            <Link
-              href="/auth/signup"
-              className="inline-block bg-[#c8ff00] text-[#0a0a0a] font-bold px-10 py-4 rounded-xl text-base hover:bg-[#d4ff33] transition-colors"
-            >
-              Request Invite →
-            </Link>
           </div>
         </div>
       </section>
