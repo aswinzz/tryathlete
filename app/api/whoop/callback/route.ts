@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { exchangeWhoopCode, DEFAULT_WHOOP_PREFS, syncWhoopData } from "@/lib/whoop";
+import { exchangeWhoopCode, DEFAULT_WHOOP_PREFS, syncWhoopData, fetchWhoopUserId } from "@/lib/whoop";
 import { captureServerEvent } from "@/lib/posthog";
 import * as Sentry from "@sentry/nextjs";
 
@@ -55,6 +55,18 @@ export async function GET(req: NextRequest) {
         dataPrefs:    JSON.stringify(DEFAULT_WHOOP_PREFS),
       },
     });
+
+    // Fetch and store WHOOP's numeric user ID so webhook events can be routed
+    fetchWhoopUserId(userId)
+      .then((whoopUserId) =>
+        prisma.trackerConnection.update({
+          where: { userId_provider: { userId, provider: "whoop" } },
+          data: { whoopUserId },
+        })
+      )
+      .catch(() => {
+        // Non-fatal — will be backfilled on the next manual sync
+      });
 
     captureServerEvent(userId, "tracker_connected", {
       provider: "whoop",

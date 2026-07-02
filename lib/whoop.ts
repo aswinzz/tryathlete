@@ -180,6 +180,24 @@ async function whoopFetchAll<T>(
   return results;
 }
 
+// ─── User profile ─────────────────────────────────────────────────────────────
+
+interface WhoopUserProfile {
+  user_id:    number;
+  email:      string;
+  first_name: string;
+  last_name:  string;
+}
+
+/**
+ * Fetch the WHOOP user ID for a connected user.
+ * Stored in TrackerConnection.whoopUserId so webhook events can be routed.
+ */
+export async function fetchWhoopUserId(userId: string): Promise<string> {
+  const profile = await whoopFetch<WhoopUserProfile>(userId, "/user/profile/basic");
+  return String(profile.user_id);
+}
+
 // ─── Main sync ────────────────────────────────────────────────────────────────
 
 export async function syncWhoopData(userId: string) {
@@ -187,6 +205,20 @@ export async function syncWhoopData(userId: string) {
     where: { userId_provider: { userId, provider: "whoop" } },
   });
   if (!conn) throw new Error("WHOOP not connected");
+
+  // Backfill whoopUserId for connections made before webhooks were added
+  if (!conn.whoopUserId) {
+    try {
+      const whoopUserId = await fetchWhoopUserId(userId);
+      await prisma.trackerConnection.update({
+        where: { userId_provider: { userId, provider: "whoop" } },
+        data: { whoopUserId },
+      });
+      console.log(`[whoop] backfilled whoopUserId=${whoopUserId}`);
+    } catch (err) {
+      console.warn("[whoop] could not backfill whoopUserId:", err instanceof Error ? err.message : err);
+    }
+  }
 
   const prefs = parseDataPrefs(conn.dataPrefs, DEFAULT_WHOOP_PREFS);
   const errors: string[] = [];
