@@ -110,27 +110,40 @@ async function refreshWhoopToken(userId: string): Promise<string> {
   return data.access_token;
 }
 
-async function whoopFetch<T>(userId: string, path: string): Promise<T> {
-  let conn = await prisma.trackerConnection.findUnique({
+/**
+ * Returns a valid access token for the user, refreshing it if expired.
+ * Call this ONCE before parallel API calls to avoid a race condition where
+ * multiple simultaneous requests all attempt to consume the same single-use
+ * refresh token.
+ */
+async function getValidWhoopToken(userId: string): Promise<string> {
+  const conn = await prisma.trackerConnection.findUnique({
     where: { userId_provider: { userId, provider: "whoop" } },
   });
   if (!conn?.accessToken) throw new Error("WHOOP not connected");
 
-  // Refresh if expired or within 60s of expiry
-  let token = conn.accessToken;
-  if (conn.tokenExpiry && conn.tokenExpiry.getTime() - Date.now() < 60_000) {
-    token = await refreshWhoopToken(userId);
+  // Refresh if expired or within 5 minutes of expiry (generous window so
+  // parallel callers all share the same fresh token rather than each racing
+  // to refresh the now-single-use refresh token)
+  if (!conn.tokenExpiry || conn.tokenExpiry.getTime() - Date.now() < 300_000) {
+    return refreshWhoopToken(userId);
   }
+  return conn.accessToken;
+}
+
+async function whoopFetch<T>(userId: string, path: string, token?: string): Promise<T> {
+  // Accept a pre-fetched token (passed in for parallel calls) or fetch one now
+  const accessToken = token ?? await getValidWhoopToken(userId);
 
   const res = await fetch(`${WHOOP_API_BASE}${path}`, {
-    headers: { Authorization: `Bearer ${token}` },
+    headers: { Authorization: `Bearer ${accessToken}` },
   });
 
-  // 401 → try one refresh
+  // 401 → try one refresh (handles tokens that expired mid-request)
   if (res.status === 401) {
-    token = await refreshWhoopToken(userId);
+    const freshToken = await refreshWhoopToken(userId);
     const retry = await fetch(`${WHOOP_API_BASE}${path}`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${freshToken}` },
     });
     if (!retry.ok) throw new Error(`WHOOP API error ${retry.status} on ${path}`);
     return retry.json() as Promise<T>;
@@ -150,7 +163,8 @@ interface WhoopPage<T> {
 async function whoopFetchAll<T>(
   userId: string,
   path: string,
-  limit = 25
+  limit = 25,
+  token?: string
 ): Promise<T[]> {
   const results: T[] = [];
   let nextToken: string | undefined;
@@ -158,7 +172,7 @@ async function whoopFetchAll<T>(
   do {
     const query = new URLSearchParams({ limit: String(limit) });
     if (nextToken) query.set("nextToken", nextToken);
-    const page = await whoopFetch<WhoopPage<T>>(userId, `${path}?${query}`);
+    const page = await whoopFetch<WhoopPage<T>>(userId, `${path}?${query}`, token);
     results.push(...(page.records ?? []));
     nextToken = page.next_token;
   } while (nextToken);
@@ -259,7 +273,8 @@ const WHOOP_SPORT_MAP: Record<number, string> = {
 };
 
 async function syncWhoopWorkouts(userId: string) {
-  const workouts = await whoopFetchAll<WhoopWorkout>(userId, "/activity/workout");
+  const token = await getValidWhoopToken(userId);
+  const workouts = await whoopFetchAll<WhoopWorkout>(userId, "/activity/workout", 25, token);
 
   for (const w of workouts) {
     const whoopId = String(w.id);
@@ -358,11 +373,16 @@ interface WhoopSleepRecord {
 }
 
 async function syncWhoopRecovery(userId: string) {
+  // Pre-fetch a valid token once so all three parallel calls share it,
+  // preventing a race where each branch tries to refresh the single-use
+  // refresh token simultaneously.
+  const token = await getValidWhoopToken(userId);
+
   // Fetch cycles, recoveries and sleeps in parallel
   const [cycles, recoveries, sleeps] = await Promise.all([
-    whoopFetchAll<WhoopCycle>(userId, "/cycle"),
-    whoopFetchAll<WhoopRecoveryRecord>(userId, "/recovery"),
-    whoopFetchAll<WhoopSleepRecord>(userId, "/activity/sleep"),
+    whoopFetchAll<WhoopCycle>(userId, "/cycle", 25, token),
+    whoopFetchAll<WhoopRecoveryRecord>(userId, "/recovery", 25, token),
+    whoopFetchAll<WhoopSleepRecord>(userId, "/activity/sleep", 25, token),
   ]);
 
   // Index by cycle id for fast lookup
