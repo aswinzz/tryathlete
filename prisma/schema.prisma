@@ -86,11 +86,13 @@ model TrackerConnection {
 }
 
 model DevicePushToken {
-  id        String   @id @default(cuid())
-  userId    String
-  token     String   @unique   // APNs device token (hex string)
-  platform  String   @default("ios")
-  createdAt DateTime @default(now())
+  id               String   @id @default(cuid())
+  userId           String
+  token            String   @unique   // APNs device token (hex string)
+  platform         String   @default("ios")
+  timezone         String?            // IANA timezone e.g. "America/New_York"
+  lastReminderDate String?            // ISO date "2024-01-15" — deduplication key
+  createdAt        DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
