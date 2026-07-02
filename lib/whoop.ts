@@ -11,6 +11,7 @@
  */
 
 import { prisma } from "./prisma";
+import { sendPushToUser } from "./push";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -319,12 +320,13 @@ async function syncWhoopWorkouts(userId: string) {
     const type = WHOOP_SPORT_MAP[w.sport_id] ?? "other";
     const score = w.score;
 
-    await prisma.activity.create({
+    const name = `WHOOP ${type.replace(/_/g, " ")}`;
+    const created = await prisma.activity.create({
       data: {
         userId,
         whoopId,
         source:      "whoop",
-        name:        `WHOOP ${type.replace(/_/g, " ")}`,
+        name,
         type,
         startTime,
         duration:    durationS,
@@ -336,6 +338,14 @@ async function syncWhoopWorkouts(userId: string) {
         rawData:     JSON.stringify(w),
       },
     });
+
+    // Notify the user's iOS device(s)
+    const durationMin = Math.round(durationS / 60);
+    sendPushToUser(userId, {
+      title: "New workout synced",
+      body:  `${name} · ${durationMin} min`,
+      data:  { type: "activity", activityId: created.id },
+    }).catch(() => {});
   }
 }
 

@@ -17,12 +17,13 @@ model User {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
-  accounts       Account[]
-  sessions       Session[]
-  activities     Activity[]
-  connections    TrackerConnection[]
-  workoutPlans   WorkoutPlan[]
+  accounts        Account[]
+  sessions        Session[]
+  activities      Activity[]
+  connections     TrackerConnection[]
+  workoutPlans    WorkoutPlan[]
   whoopRecoveries WhoopRecovery[]
+  pushTokens      DevicePushToken[]
 
   mcpToken    String?  @unique // auth token for MCP endpoint
 }
@@ -82,6 +83,18 @@ model TrackerConnection {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, provider])
+}
+
+model DevicePushToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique   // APNs device token (hex string)
+  platform  String   @default("ios")
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model Activity {

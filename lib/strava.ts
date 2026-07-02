@@ -13,6 +13,7 @@
 import { prisma } from "./prisma";
 import type { RoutePoint } from "./routeUtils";
 import { downsample } from "./routeUtils";
+import { sendPushToUser } from "./push";
 import { parseDataPrefs } from "./whoop";
 import { getHRZone } from "./utils";
 
@@ -404,6 +405,14 @@ export async function importSingleStravaActivity(userId: string, stravaActivityI
   }
 
   console.log(`[strava] webhook: imported ${stravaId} → activity ${created.id}`);
+
+  // Notify the user's iOS device(s)
+  const distanceKm = act.distance > 0 ? ` · ${(act.distance / 1000).toFixed(1)} km` : "";
+  sendPushToUser(userId, {
+    title: "New activity synced",
+    body:  `${act.name}${distanceKm}`,
+    data:  { type: "activity", activityId: created.id },
+  }).catch(() => {});
 }
 
 async function syncStravaActivities(userId: string, after: Date | null) {
