@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
   const redirectUri = `${process.env.NEXTAUTH_URL}/api/strava/callback`;
 
   try {
-    const { accessToken, refreshToken, expiresAt } = await exchangeStravaCode(code, redirectUri);
+    const { accessToken, refreshToken, expiresAt, athleteId } = await exchangeStravaCode(code, redirectUri);
     const expiry = new Date(expiresAt * 1000);
 
     // Auto-enable syncActivities unless another provider already owns it
@@ -55,17 +55,19 @@ export async function GET(req: NextRequest) {
       update: {
         accessToken,
         refreshToken,
-        tokenExpiry: expiry,
-        connectedAt: new Date(),
-        dataPrefs:   JSON.stringify(prefs),
+        tokenExpiry:     expiry,
+        connectedAt:     new Date(),
+        dataPrefs:       JSON.stringify(prefs),
+        stravaAthleteId: athleteId ? String(athleteId) : undefined,
       },
       create: {
         userId,
-        provider:    "strava",
+        provider:        "strava",
         accessToken,
         refreshToken,
-        tokenExpiry: expiry,
-        dataPrefs:   JSON.stringify(prefs),
+        tokenExpiry:     expiry,
+        dataPrefs:       JSON.stringify(prefs),
+        stravaAthleteId: athleteId ? String(athleteId) : undefined,
       },
     });
 

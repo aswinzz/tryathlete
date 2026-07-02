@@ -279,6 +279,20 @@ export async function syncStravaData(userId: string) {
   const prefs = parseDataPrefs(conn.dataPrefs, DEFAULT_STRAVA_PREFS as Parameters<typeof parseDataPrefs>[1]);
   console.log(`[strava] sync start — syncActivities=${prefs.syncActivities}, lastSyncAt=${conn.lastSyncAt}`);
 
+  // Backfill stravaAthleteId for connections made before webhooks were added
+  if (!conn.stravaAthleteId) {
+    try {
+      const athlete = await stravaFetch<{ id: number }>(userId, "/athlete");
+      await prisma.trackerConnection.update({
+        where: { userId_provider: { userId, provider: "strava" } },
+        data: { stravaAthleteId: String(athlete.id) },
+      });
+      console.log(`[strava] backfilled stravaAthleteId=${athlete.id}`);
+    } catch (err) {
+      console.warn("[strava] could not backfill stravaAthleteId:", err instanceof Error ? err.message : err);
+    }
+  }
+
   if (prefs.syncActivities) {
     await syncStravaActivities(userId, conn.lastSyncAt);
   } else {
@@ -289,6 +303,107 @@ export async function syncStravaData(userId: string) {
     where: { userId_provider: { userId, provider: "strava" } },
     data: { lastSyncAt: new Date() },
   });
+}
+
+/**
+ * Import a single Strava activity by ID — called from the webhook handler
+ * when Strava pushes an activity.create event. Skips if the user has
+ * syncActivities=false or the activity already exists.
+ */
+export async function importSingleStravaActivity(userId: string, stravaActivityId: number) {
+  const conn = await prisma.trackerConnection.findUnique({
+    where: { userId_provider: { userId, provider: "strava" } },
+  });
+  if (!conn) return;
+
+  const prefs = parseDataPrefs(conn.dataPrefs, DEFAULT_STRAVA_PREFS as Parameters<typeof parseDataPrefs>[1]);
+  if (!prefs.syncActivities) {
+    console.log(`[strava] webhook: syncActivities=false for ${userId}, skipping ${stravaActivityId}`);
+    return;
+  }
+
+  const stravaId = String(stravaActivityId);
+  const exists = await prisma.activity.findUnique({ where: { stravaId } });
+  if (exists) {
+    console.log(`[strava] webhook: activity ${stravaId} already imported`);
+    return;
+  }
+
+  const act = await stravaFetch<StravaDetailedActivity>(userId, `/activities/${stravaActivityId}`);
+  const sportType   = act.sport_type || act.type;
+  const type        = mapStravaType(sportType);
+  const startTime   = new Date(act.start_date);
+  const avgSpeedMps = act.average_speed ?? 0;
+  const avgPace     = avgSpeedMps > 0 ? 1 / avgSpeedMps : null;
+
+  let routePoints: string | null = null;
+  if (act.map?.summary_polyline) {
+    const pts = decodePolyline(act.map.summary_polyline);
+    if (pts.length > 0) routePoints = JSON.stringify(downsample(pts, 200));
+  }
+
+  const calories =
+    act.calories
+      ? Math.round(act.calories)
+      : act.kilojoules
+      ? Math.round(act.kilojoules / 4.184 * 1000)
+      : null;
+
+  console.log(`[strava] webhook: importing ${stravaId} — ${act.name} (${sportType})`);
+  const created = await prisma.activity.create({
+    data: {
+      userId,
+      stravaId,
+      source:       "strava",
+      name:         act.name,
+      type,
+      startTime,
+      duration:     act.moving_time,
+      distance:     act.distance > 0 ? act.distance : null,
+      avgPace,
+      avgHeartRate: act.average_heartrate ? Math.round(act.average_heartrate) : null,
+      maxHeartRate: act.max_heartrate     ? Math.round(act.max_heartrate)     : null,
+      elevGain:     act.total_elevation_gain > 0 ? act.total_elevation_gain : null,
+      calories,
+      routePoints,
+      rawData:      JSON.stringify(act),
+    },
+  });
+
+  // Laps (for endurance activities)
+  if (act.laps?.length > 1) {
+    await prisma.activityLap.createMany({
+      data: act.laps.map((lap) => ({
+        activityId:   created.id,
+        lapIndex:     lap.lap_index,
+        distance:     lap.distance,
+        duration:     lap.elapsed_time,
+        avgHeartRate: lap.average_heartrate ? Math.round(lap.average_heartrate) : null,
+        maxHeartRate: lap.max_heartrate     ? Math.round(lap.max_heartrate)     : null,
+        avgPace:      lap.average_speed && lap.average_speed > 0 ? 1 / lap.average_speed : null,
+        startTime:    new Date(lap.start_date),
+      })),
+      skipDuplicates: true,
+    });
+  }
+
+  // HR stream
+  if (act.average_heartrate) {
+    const { hrStream, hrZones, minHeartRate: minHR } = await fetchStravaHR(userId, act.id);
+    if (hrStream || hrZones || minHR) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await (prisma.activity.update as any)({
+        where: { id: created.id },
+        data: {
+          ...(hrStream ? { hrStream } : {}),
+          ...(hrZones  ? { hrZones  } : {}),
+          ...(minHR    ? { minHeartRate: minHR } : {}),
+        },
+      });
+    }
+  }
+
+  console.log(`[strava] webhook: imported ${stravaId} → activity ${created.id}`);
 }
 
 async function syncStravaActivities(userId: string, after: Date | null) {
