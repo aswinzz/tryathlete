@@ -9,17 +9,13 @@ export const dynamic = "force-dynamic";
 // ---------------------------------------------------------------------------
 
 /**
- * Returns the local hour (0-23) and ISO date string ("YYYY-MM-DD") for the
- * given IANA timezone. Uses the Swedish locale which produces
- * "YYYY-MM-DD HH:MM:SS" — convenient for splitting.
+ * Returns the ISO date string ("YYYY-MM-DD") for the given IANA timezone.
+ * Uses the Swedish locale which produces "YYYY-MM-DD HH:MM:SS".
  */
-function getLocalInfo(timezone: string): { hour: number; dateStr: string } {
+function getLocalDateStr(timezone: string): string {
   const now = new Date();
   const localStr = now.toLocaleString("sv", { timeZone: timezone });
-  // "2024-01-15 07:30:00"
-  const [datePart, timePart] = localStr.split(" ");
-  const hour = parseInt(timePart.split(":")[0], 10);
-  return { hour, dateStr: datePart };
+  return localStr.split(" ")[0]; // "YYYY-MM-DD"
 }
 
 /**
@@ -132,17 +128,13 @@ export async function GET(req: NextRequest) {
   for (const row of rows) {
     if (!row.timezone) continue;
 
-    let hour: number;
     let dateStr: string;
     try {
-      ({ hour, dateStr } = getLocalInfo(row.timezone));
+      dateStr = getLocalDateStr(row.timezone);
     } catch {
       skipped++;
       continue; // invalid IANA timezone stored
     }
-
-    // Only fire between 07:00 and 07:59 local time
-    if (hour !== 7) { skipped++; continue; }
 
     // Already sent today?
     if (row.lastReminderDate === dateStr) { skipped++; continue; }
