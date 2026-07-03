@@ -2,8 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyMobileToken } from "@/lib/mobileAuth";
 import { formatDuration } from "@/lib/utils";
+import { parseDataPrefs, DEFAULT_WHOOP_PREFS, DEFAULT_GARMIN_PREFS } from "@/lib/whoop";
+import { DEFAULT_STRAVA_PREFS } from "@/lib/strava";
 
 export const dynamic = "force-dynamic";
+
+const PREF_DEFAULTS: Record<string, typeof DEFAULT_WHOOP_PREFS> = {
+  whoop:  DEFAULT_WHOOP_PREFS,
+  garmin: DEFAULT_GARMIN_PREFS as typeof DEFAULT_WHOOP_PREFS,
+  strava: DEFAULT_STRAVA_PREFS as typeof DEFAULT_WHOOP_PREFS,
+};
 
 export async function GET(req: NextRequest) {
   const userId = await verifyMobileToken(req);
@@ -13,7 +21,7 @@ export async function GET(req: NextRequest) {
     where: { id: userId },
     include: {
       activities: { select: { type: true, distance: true, duration: true, startTime: true } },
-      connections: { select: { provider: true, lastSyncAt: true } },
+      connections: { select: { provider: true, lastSyncAt: true, dataPrefs: true } },
     },
   });
   if (!user) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -61,12 +69,14 @@ export async function GET(req: NextRequest) {
     )
   );
 
-  // Connections — normalized for mobile
+  // Connections — normalized for mobile, including data prefs so the app
+  // can show the selected activity source (mirrors /api/tracker/connections)
   const connections = user.connections.map((c) => ({
     id: c.provider,
     service: c.provider,
     connected: true, // Swift CodingKey decodes from "connected" key; all rows are active pre-migration
     lastSyncAt: c.lastSyncAt?.toISOString() ?? null,
+    prefs: parseDataPrefs(c.dataPrefs, PREF_DEFAULTS[c.provider] ?? DEFAULT_WHOOP_PREFS),
   }));
 
   return NextResponse.json({
