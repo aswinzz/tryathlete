@@ -109,9 +109,14 @@ async function getTodayEntries(
  * Protected by ADMIN_SECRET (Vercel Cron sends it via Authorization header).
  */
 export async function GET(req: NextRequest) {
-  const secret = process.env.ADMIN_SECRET;
-  const auth   = req.headers.get("Authorization");
-  if (!secret || auth !== `Bearer ${secret}`) {
+  // Vercel automatically injects CRON_SECRET and sends it as
+  // "Authorization: Bearer <CRON_SECRET>" when firing scheduled jobs.
+  // Fall back to ADMIN_SECRET so you can also trigger this manually.
+  const cronSecret  = process.env.CRON_SECRET;
+  const adminSecret = process.env.ADMIN_SECRET;
+  const auth        = req.headers.get("Authorization");
+  const validSecrets = [cronSecret, adminSecret].filter(Boolean);
+  if (!validSecrets.length || !validSecrets.some(s => auth === `Bearer ${s}`)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
