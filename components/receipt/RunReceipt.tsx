@@ -198,7 +198,6 @@ export function RunReceipt({
                 {laps.map((lap) => {
                   const zone = lap.zone || 2;
                   const zoneColor = ZONE_COLORS[zone];
-                  const isFastest = fastestLap?.lapIndex === lap.lapIndex && laps.length > 2;
                   const lapPace = lap.avgPace
                     ? isSwim ? formatPace100m(lap.avgPace) : isCycle ? `${formatSpeed(1 / lap.avgPace)}` : formatPace(lap.avgPace)
                     : "—";
@@ -206,7 +205,6 @@ export function RunReceipt({
                     <div key={lap.lapIndex} style={{ display: "grid", gridTemplateColumns: "3fr 2.5fr 1fr 2.5fr 2fr", alignItems: "center", padding: "9px 0", ...MONO }}>
                       <span style={{ color: "#111", fontSize: 11, display: "flex", alignItems: "center", gap: 4 }}>
                         {lapDistanceLabel(lap.distance)}
-                        {isFastest && <span style={{ background: "#111", color: "#fafaf8", fontSize: 6, fontWeight: 700, padding: "2px 5px", borderRadius: 6 }}>FAST</span>}
                       </span>
                       <span style={{ color: "#111", fontSize: 11, textAlign: "center" }}>{lapPace}</span>
                       <span style={{ display: "flex", justifyContent: "center" }}>

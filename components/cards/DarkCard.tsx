@@ -74,9 +74,6 @@ export function DarkCard({
   // In glass mode, borders become subtle white lines
   const bdr = glass ? "rgba(255,255,255,0.13)" : "#1e1e1e";
 
-  const fastestLap = laps.reduce(
-    (best: Lap | null, l) => !best || (l.avgPace && (!best.avgPace || l.avgPace < best.avgPace)) ? l : best, null
-  );
   const paceColLabel = isSwim ? "PACE/100M" : isCycle ? "SPEED" : "PACE";
 
   return (
@@ -124,13 +121,11 @@ export function DarkCard({
           {laps.map((lap) => {
             const zone = lap.zone || 2;
             const zoneColor = ZONE_COLORS[zone];
-            const isFastest = fastestLap?.lapIndex === lap.lapIndex && laps.length > 2;
             const lapPace = lap.avgPace ? (isSwim ? formatPace100m(lap.avgPace) : isCycle ? `${formatSpeed(1 / lap.avgPace)}` : formatPace(lap.avgPace)) : "—";
             return (
               <div key={lap.lapIndex} style={{ display: "grid", gridTemplateColumns: "3fr 2.5fr 1fr 2.5fr 2fr", alignItems: "center", padding: "9px 0", borderBottom: `1px solid ${bdr}` }}>
                 <span style={{ fontFamily: "system-ui, sans-serif", fontSize: 11, color: TEXT, display: "flex", alignItems: "center", gap: 5 }}>
                   {lapDistanceLabel(lap.distance)}
-                  {isFastest && <span style={{ background: ACCENT, color: "#000", fontSize: 7, fontWeight: 800, padding: "2px 5px", borderRadius: 4 }}>FAST</span>}
                 </span>
                 <span style={{ fontFamily: "system-ui, sans-serif", fontSize: 11, fontWeight: 700, color: TEXT, textAlign: "center" }}>{lapPace}</span>
                 <span style={{ display: "flex", justifyContent: "center" }}>

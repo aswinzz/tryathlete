@@ -78,9 +78,6 @@ export function RetroCard({
   const hrBdr = glass ? "rgba(255,255,255,0.4)" : "#1a1a1a";
   const mapStroke = glass ? "#ffffff" : "#1a1a1a";
 
-  const fastestLap = laps.reduce(
-    (best: Lap | null, l) => !best || (l.avgPace && (!best.avgPace || l.avgPace < best.avgPace)) ? l : best, null
-  );
   const paceColLabel = isSwim ? "PACE/100" : isCycle ? "SPEED" : "PACE";
 
   return (
@@ -140,13 +137,11 @@ export function RetroCard({
           {laps.map((lap) => {
             const zone = lap.zone || 2;
             const zoneColor = ZONE_COLORS[zone];
-            const isFastest = fastestLap?.lapIndex === lap.lapIndex && laps.length > 2;
             const lapPace = lap.avgPace ? (isSwim ? formatPace100m(lap.avgPace) : isCycle ? `${formatSpeed(1 / lap.avgPace)}` : formatPace(lap.avgPace)) : "—";
             return (
               <div key={lap.lapIndex} style={{ display: "grid", gridTemplateColumns: "3fr 2.5fr 1fr 2.5fr 2fr", alignItems: "center", padding: "6px 0", borderBottom: `1px solid ${bdr}` }}>
                 <span style={{ ...MONO, fontSize: 10, color: text, display: "flex", alignItems: "center", gap: 4 }}>
                   {lapDistanceLabel(lap.distance)}
-                  {isFastest && <span style={{ background: glass ? "rgba(255,255,255,0.9)" : "#1a1a1a", color: glass ? "#1a1a1a" : BG, fontSize: 6, fontWeight: 700, padding: "1px 4px" }}>FAST</span>}
                 </span>
                 <span style={{ ...MONO, fontSize: 10, color: text, fontWeight: 700, textAlign: "center" }}>{lapPace}</span>
                 <span style={{ display: "flex", justifyContent: "center" }}>
