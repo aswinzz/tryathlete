@@ -55,10 +55,16 @@ export const GET = withApiHandler(async (req: NextRequest) => {
     where: { userId },
     select: { type: true, distance: true, duration: true, avgPace: true, startTime: true },
   });
+  // Only count suggestions on entries that aren't already matched — an entry
+  // with a confirmed (AUTO/MANUAL) link no longer needs review even if stale
+  // SUGGESTED rows exist alongside it.
   const suggestedP = prisma.planActivityLink.count({
     where: {
       status: "SUGGESTED",
-      entry: { day: { week: { plan: { userId, isActive: true } } } },
+      entry: {
+        day: { week: { plan: { userId, isActive: true } } },
+        links: { none: { status: { in: ["AUTO", "MANUAL"] } } },
+      },
     },
   });
   const plan = await planP;

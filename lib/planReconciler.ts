@@ -230,11 +230,16 @@ export async function reconcileActivity(
 
   // Score each entry in the target day
   for (const entry of targetDay.entries) {
-    // Already has a non-rejected link for this activity?
-    const existingLink = entry.links.find(
-      (l) => l.activityId === activity.id && l.status !== "REJECTED"
+    // Any existing link for this (entry, activity) pair that the user has already
+    // decided on (AUTO/MANUAL/REJECTED) must not be overwritten — a REJECTED pair
+    // must never be resurrected, and confirmed links must never be downgraded.
+    const existingLink = entry.links.find((l) => l.activityId === activity.id);
+    if (existingLink && existingLink.status !== "SUGGESTED") continue;
+
+    // Entry already matched to some other activity → nothing to suggest
+    const entryMatched = entry.links.some(
+      (l) => l.status === "AUTO" || l.status === "MANUAL"
     );
-    if (existingLink) continue;
 
     const confidence = scoreMatch(
       {
@@ -253,7 +258,7 @@ export async function reconcileActivity(
       }
     );
 
-    if (confidence >= AUTO_LINK_THRESHOLD) {
+    if (confidence >= AUTO_LINK_THRESHOLD && !entryMatched) {
       await prisma.planActivityLink.upsert({
         where: { entryId_activityId: { entryId: entry.id, activityId: activity.id } },
         update: { confidence, status: "AUTO" },
@@ -261,7 +266,7 @@ export async function reconcileActivity(
       });
       result.linked++;
       await maybeCompleteDayAfterLink(targetDay.id);
-    } else if (confidence >= SUGGEST_THRESHOLD) {
+    } else if (confidence >= SUGGEST_THRESHOLD && !entryMatched) {
       await prisma.planActivityLink.upsert({
         where: { entryId_activityId: { entryId: entry.id, activityId: activity.id } },
         update: { confidence, status: "SUGGESTED" },
@@ -319,10 +324,16 @@ export async function reconcileDay(
 
   for (const activity of activities) {
     for (const entry of day.entries) {
-      const existingLink = entry.links.find(
-        (l) => l.activityId === activity.id && l.status !== "REJECTED"
+      // Never overwrite links the user has decided on (REJECTED stays rejected,
+      // AUTO/MANUAL stay confirmed) — only existing SUGGESTED rows may be re-scored.
+      const existingLink = entry.links.find((l) => l.activityId === activity.id);
+      if (existingLink && existingLink.status !== "SUGGESTED") continue;
+
+      // Entry already matched to some other activity → nothing to link or suggest
+      const entryMatched = entry.links.some(
+        (l) => l.status === "AUTO" || l.status === "MANUAL"
       );
-      if (existingLink) continue;
+      if (entryMatched) { totals.skipped++; continue; }
 
       const confidence = scoreMatch(
         { id: activity.id, type: activity.type, distance: activity.distance, duration: activity.duration, avgPace: activity.avgPace },

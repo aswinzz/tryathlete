@@ -45,5 +45,13 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
     data: { status: "MANUAL" },
     include: { activity: { select: { id: true, name: true, type: true, startTime: true, distance: true, duration: true, avgPace: true, avgHeartRate: true, calories: true } } },
   });
+
+  // Supersede any remaining suggestions on this entry — it's matched now,
+  // so they no longer need review.
+  await prisma.planActivityLink.updateMany({
+    where: { entryId, status: "SUGGESTED", id: { not: linkId } },
+    data: { status: "REJECTED" },
+  });
+
   return NextResponse.json(updated);
 }

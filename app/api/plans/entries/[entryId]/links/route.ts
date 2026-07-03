@@ -58,6 +58,12 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     include: { activity: { select: { id: true, name: true, type: true, startTime: true, distance: true, duration: true, avgPace: true, avgHeartRate: true, calories: true } } },
   });
 
+  // Supersede any remaining suggestions on this entry — it's matched now.
+  await prisma.planActivityLink.updateMany({
+    where: { entryId, status: "SUGGESTED", activityId: { not: activityId } },
+    data: { status: "REJECTED" },
+  });
+
   // Auto-complete day if all entries now have confirmed links
   const dayId = entry.dayId;
   const allEntries = await prisma.workoutEntry.findMany({
