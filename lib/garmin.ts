@@ -229,8 +229,10 @@ export const ZONE_COLORS: Record<number, string> = {
  *   metricDescriptors  — maps column index → metric key
  *   activityDetailMetrics — rows of per-second measurements
  *
- * HR key: "directHeartRate"  (bpm)
- * Time key: "directTimestamp" (not used; each row has startTimeGMT instead)
+ * HR key:   "directHeartRate" (bpm)
+ * Time key: "directTimestamp" (epoch ms) — this is the reliable per-row time
+ * source. Rows do NOT generally carry a startTimeGMT property (assuming they
+ * did was why Garmin HR extraction silently produced nothing).
  */
 export function extractDetailsData(
   details: GarminDetailsResponse | null | undefined,
@@ -255,16 +257,28 @@ export function extractDetailsData(
   if (!hrDesc) return out;
 
   const hrIdx = hrDesc.metricsIndex;
+  const tsIdx = descriptors.find((d) => d.key === "directTimestamp")?.metricsIndex ?? null;
   const startMs = activityStartTime.getTime();
 
-  // Build {t, bpm} pairs from the rows
+  // Build {t, bpm} pairs from the rows.
+  // Time resolution order: directTimestamp metric column (epoch ms, standard) →
+  // row.startTimeGMT (rare, older response shape) → skip the row.
   const hrPts: { t: number; bpm: number }[] = [];
   for (const row of rows) {
     const bpm = row.metrics[hrIdx];
     if (!bpm || bpm <= 0) continue;
-    // startTimeGMT format: "2024-03-15 07:30:00" (no tz suffix — treat as UTC)
-    if (!row.startTimeGMT) continue;
-    const ptMs = new Date(row.startTimeGMT.replace(" ", "T") + "Z").getTime();
+
+    let ptMs: number | null = null;
+    if (tsIdx !== null) {
+      const ts = row.metrics[tsIdx];
+      if (typeof ts === "number" && ts > 0) ptMs = ts;
+    }
+    if (ptMs === null && row.startTimeGMT) {
+      // "2024-03-15 07:30:00" (no tz suffix — treat as UTC)
+      ptMs = new Date(row.startTimeGMT.replace(" ", "T") + "Z").getTime();
+    }
+    if (ptMs === null || Number.isNaN(ptMs)) continue;
+
     const t = Math.round((ptMs - startMs) / 1000);
     if (t < 0) continue;
     hrPts.push({ t, bpm: Math.round(bpm) });
