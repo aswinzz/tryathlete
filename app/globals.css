@@ -154,3 +154,54 @@ body {
   from { background-position: 0 0; }
   to   { background-position: 20px 0; }
 }
+
+/* ── Landing page (futuristic) ─────────────────────────── */
+@keyframes lp-ticker {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+@keyframes lp-grid-pan {
+  from { background-position: 0 0; }
+  to   { background-position: 0 48px; }
+}
+
+@keyframes lp-blink {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0; }
+}
+
+.lp-grid-bg {
+  background-image:
+    linear-gradient(rgba(200, 255, 0, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(200, 255, 0, 0.05) 1px, transparent 1px);
+  background-size: 48px 48px;
+  animation: lp-grid-pan 3.5s linear infinite;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 35%, black 30%, transparent 75%);
+  -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 35%, black 30%, transparent 75%);
+}
+
+.lp-glow-card {
+  transition: border-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s ease;
+}
+.lp-glow-card:hover {
+  border-color: rgba(200, 255, 0, 0.35);
+  box-shadow: 0 0 32px rgba(200, 255, 0, 0.08), 0 8px 40px rgba(0, 0, 0, 0.5);
+}
+
+@keyframes lp-scan {
+  from { top: -30%; }
+  to   { top: 130%; }
+}
+
+.lp-scanline { position: relative; overflow: hidden; }
+.lp-scanline::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0;
+  height: 64px;
+  top: -30%;
+  background: linear-gradient(to bottom, transparent, rgba(200, 255, 0, 0.05), transparent);
+  animation: lp-scan 3.6s linear infinite;
+  pointer-events: none;
+}
