@@ -129,6 +129,9 @@ model Activity {
   user  User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   laps  ActivityLap[]
   links PlanActivityLink[]
+
+  // Every list/feed/profile query filters by userId and sorts by startTime
+  @@index([userId, startTime(sort: Desc)])
 }
 
 // ─── Workout Plan ────────────────────────────────────────────────────────────
@@ -185,6 +188,9 @@ model WorkoutPlan {
 
   user  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   weeks WorkoutWeek[]
+
+  // Active-plan lookups (feed, today-plan) and per-user plan lists
+  @@index([userId, isActive])
 }
 
 model WorkoutWeek {
@@ -242,6 +248,8 @@ model PlanActivityLink {
   activity Activity     @relation(fields: [activityId], references: [id], onDelete: Cascade)
 
   @@unique([entryId, activityId])
+  // Activity-side lookups + cascade deletes (Postgres doesn't index FK columns)
+  @@index([activityId])
 }
 
 // ─── WHOOP Recovery / Sleep / Strain ─────────────────────────────────────────
@@ -278,6 +286,8 @@ model WhoopRecovery {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, whoopCycleId])
+  // Recovery history + "today" queries filter by userId and sort by date
+  @@index([userId, date(sort: Desc)])
 }
 
 // ─── Activity Laps ────────────────────────────────────────────────────────────

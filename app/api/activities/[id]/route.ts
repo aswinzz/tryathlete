@@ -13,6 +13,9 @@ export async function GET(
   const activity = await prisma.activity.findFirst({
     where: { id, userId },
     include: { laps: { orderBy: { lapIndex: "asc" } } },
+    // rawData is a write-only blob (full Garmin/Strava JSON, often 100s of KB)
+    // that no client reads — omitting it drastically shrinks the response.
+    omit: { rawData: true },
   });
 
   if (!activity) return NextResponse.json({ error: "Not found" }, { status: 404 });

@@ -46,11 +46,7 @@ export const GET = withApiHandler(async (req: NextRequest) => {
     where: { userId, isActive: true },
     select: { id: true, title: true, startDate: true, weeks: { select: { weekNumber: true } } },
   });
-  const recentP = prisma.activity.findMany({
-    where: { userId, startTime: { gte: streakWindow } },
-    select: { type: true, distance: true, duration: true, startTime: true },
-    orderBy: { startTime: "desc" },
-  });
+  // Single scan serves both the streak/volume window and all-time PRs
   const prsP = prisma.activity.findMany({
     where: { userId },
     select: { type: true, distance: true, duration: true, avgPace: true, startTime: true },
@@ -68,9 +64,9 @@ export const GET = withApiHandler(async (req: NextRequest) => {
     },
   });
   const plan = await planP;
-  const recentActivities = await recentP;
   const allForPRs = await prsP;
   const suggestedCount = await suggestedP;
+  const recentActivities = allForPRs.filter((a) => a.startTime >= streakWindow);
 
   // ── This week's volume ────────────────────────────────────────────────────
   const thisWeek = recentActivities.filter((a) => a.startTime >= weekStart);

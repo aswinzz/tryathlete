@@ -30,6 +30,15 @@ async function ownedDay(userId: string, planId: string, weekId: string, dayId: s
   return day?.week.plan.userId === userId && day.week.plan.id === planId ? day : null;
 }
 
+/** Ownership check only — no entries/links/activities. Use for PATCH/DELETE. */
+async function isOwnedDay(userId: string, planId: string, weekId: string, dayId: string): Promise<boolean> {
+  const day = await prisma.workoutDay.findFirst({
+    where: { id: dayId, weekId },
+    select: { week: { select: { plan: { select: { userId: true, id: true } } } } },
+  });
+  return day?.week.plan.userId === userId && day.week.plan.id === planId;
+}
+
 export async function GET(req: NextRequest, { params }: Ctx) {
   const userId = await getUserId(req);
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -45,7 +54,7 @@ export async function PATCH(req: NextRequest, { params }: Ctx) {
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id, weekId, dayId } = await params;
 
-  if (!(await ownedDay(userId, id, weekId, dayId)))
+  if (!(await isOwnedDay(userId, id, weekId, dayId)))
     return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const body = await req.json();
@@ -70,7 +79,7 @@ export async function DELETE(req: NextRequest, { params }: Ctx) {
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id, weekId, dayId } = await params;
 
-  if (!(await ownedDay(userId, id, weekId, dayId)))
+  if (!(await isOwnedDay(userId, id, weekId, dayId)))
     return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   await prisma.workoutDay.delete({ where: { id: dayId } });
