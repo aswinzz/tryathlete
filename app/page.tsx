@@ -66,7 +66,8 @@ export default function LandingPage() {
     target: heroRef,
     offset: ["start start", "end start"],
   });
-  const heroY = useTransform(scrollYProgress, [0, 1], [0, 120]);
+  // Opacity-only parallax — translating the hero down on scroll made its
+  // content slide underneath the ticker strip and get covered.
   const heroOpacity = useTransform(scrollYProgress, [0, 0.9], [1, 0.15]);
 
   return (
@@ -80,7 +81,7 @@ export default function LandingPage() {
         className="border-b border-white/6 sticky top-0 z-50 bg-[#0a0a0a]/80 backdrop-blur-md"
       >
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-          <Image src="/logo.png" alt="TryAthlete" width={100} height={32} className="object-contain" />
+          <Image src="/logo.png" alt="TryAthlete" width={100} height={32} className="h-7 w-auto object-contain" />
           <div className="hidden md:flex items-center gap-8 text-sm text-[#888]">
             <a href="#problem" className="hover:text-[#c8ff00] transition-colors">Why TryAthlete</a>
             <a href="#how" className="hover:text-[#c8ff00] transition-colors">How it works</a>
@@ -131,7 +132,7 @@ export default function LandingPage() {
         ))}
 
         <motion.div
-          style={{ y: heroY, opacity: heroOpacity }}
+          style={{ opacity: heroOpacity }}
           className="relative max-w-6xl mx-auto px-6 pt-24 pb-16 text-center"
         >
           <motion.div
@@ -444,10 +445,17 @@ export default function LandingPage() {
                 <br />
                 Give it real training data.
               </h2>
-              <p className="text-[#888] leading-relaxed">
+              <p className="text-[#888] leading-relaxed mb-8">
                 Currently available by invite only. If you train with data and use AI,
                 this is built for you.
               </p>
+              <a
+                href="mailto:aswinvb.dev@gmail.com?subject=TryAthlete%20invite"
+                className="inline-block bg-[#c8ff00] text-[#0a0a0a] font-bold px-8 py-4 rounded-xl text-base hover:bg-[#d9ff4d] transition-colors"
+              >
+                Request an invite →
+              </a>
+              <p className="text-[#555] text-xs mt-4 font-mono">aswinvb.dev@gmail.com</p>
             </div>
           </Reveal>
         </div>
@@ -457,10 +465,18 @@ export default function LandingPage() {
       <footer className="border-t border-white/6 py-10">
         <div className="max-w-6xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <Image src="/logo.png" alt="TryAthlete" width={80} height={26} className="object-contain" />
+            <Image src="/logo.png" alt="TryAthlete" width={80} height={26} className="h-6 w-auto object-contain" />
             <span className="text-[#555] text-sm">The training data layer for your AI.</span>
           </div>
-          <p className="text-[#555] text-sm">© 2026 TryAthlete · iOS Invite Only Beta</p>
+          <div className="flex flex-col md:flex-row items-center gap-2 md:gap-6">
+            <a
+              href="mailto:aswinvb.dev@gmail.com"
+              className="text-[#888] text-sm hover:text-[#c8ff00] transition-colors"
+            >
+              aswinvb.dev@gmail.com
+            </a>
+            <p className="text-[#555] text-sm">© 2026 TryAthlete · iOS Invite Only Beta</p>
+          </div>
         </div>
       </footer>
     </div>
