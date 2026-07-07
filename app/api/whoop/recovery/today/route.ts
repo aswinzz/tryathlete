@@ -32,5 +32,33 @@ export async function GET(req: NextRequest) {
     },
   });
 
-  return NextResponse.json({ record: record ?? null });
+  if (record) return NextResponse.json({ record });
+
+  // No WHOOP data — fall back to today's Garmin wellness (Training Readiness /
+  // Body Battery), mapped into the same record shape. Garmin days are calendar
+  // dates, so a 48h window covers "today" in any timezone.
+  const gCutoff = new Date(Date.now() - 48 * 60 * 60 * 1000);
+  const g = await prisma.garminWellness.findFirst({
+    where: { userId, date: { gte: gCutoff } },
+    orderBy: { date: "desc" },
+  });
+
+  if (!g) return NextResponse.json({ record: null });
+
+  return NextResponse.json({
+    record: {
+      id: g.id,
+      date: g.date,
+      recoveryScore: g.trainingReadiness ?? g.bodyBattery ?? null,
+      hrv: g.hrv,
+      restingHR: g.restingHR,
+      spo2: null,
+      totalSleepMin: g.totalSleepMin,
+      remMin: g.remMin, deepMin: g.deepMin, lightMin: g.lightMin, awakeMin: g.awakeMin,
+      sleepScore: g.sleepScore,
+      sleepEff: null,
+      strain: null, kilojoule: null, avgHR: null, maxHR: null,
+      source: "garmin",
+    },
+  });
 }

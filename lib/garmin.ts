@@ -4,6 +4,7 @@ import { downsample } from "./routeUtils";
 import { reconcileActivity } from "./planReconciler";
 import { getHRZone } from "./utils";
 import { decrypt } from "./encryption";
+import { parseDataPrefs, DEFAULT_GARMIN_PREFS, type WhoopDataPrefs } from "./whoop";
 
 /**
  * Parse a Garmin time string (e.g. "2024-03-15 07:30:00") as UTC.
@@ -322,6 +323,149 @@ export function buildHRData(
   }
 
   return { stream, zones, minHR };
+}
+
+// ─── Garmin Wellness (Training Readiness / recovery / sleep) ─────────────────
+
+interface GarminReadinessEntry {
+  score?: number | null;
+  level?: string | null;
+}
+
+interface GarminHRVResponse {
+  hrvSummary?: {
+    lastNightAvg?: number | null;
+    status?: string | null;
+  };
+}
+
+interface GarminUserSummary {
+  restingHeartRate?: number | null;
+  bodyBatteryHighestValue?: number | null;
+  bodyBatteryMostRecentValue?: number | null;
+}
+
+interface GarminSleepResponse {
+  dailySleepDTO?: {
+    sleepTimeSeconds?: number | null;
+    deepSleepSeconds?: number | null;
+    lightSleepSeconds?: number | null;
+    remSleepSeconds?: number | null;
+    awakeSleepSeconds?: number | null;
+    sleepScores?: { overall?: { value?: number | null } };
+  };
+}
+
+interface GarminSocialProfile {
+  displayName?: string;
+}
+
+/**
+ * Sync Garmin wellness data (Training Readiness, HRV, resting HR, Body Battery,
+ * sleep) for the last `days` days into the GarminWellness table.
+ *
+ * Uses the same unofficial Connect API session as activity sync. Every per-day
+ * and per-metric fetch is individually fault-tolerant: not all watches support
+ * Training Readiness or HRV status, so partial data is expected and fine.
+ */
+export async function syncGarminWellness(userId: string, days = 7) {
+  const conn = await prisma.trackerConnection.findUnique({
+    where: { userId_provider: { userId, provider: "garmin" } },
+  });
+  if (!conn?.garminUsername) return;
+
+  const prefs: WhoopDataPrefs = parseDataPrefs(
+    conn.dataPrefs,
+    DEFAULT_GARMIN_PREFS as WhoopDataPrefs
+  );
+  if (!prefs.syncRecovery && !prefs.syncSleep) return;
+
+  const client = await getGarminClient(userId);
+
+  // displayName is required by the wellness/usersummary endpoints
+  let displayName: string | null = null;
+  try {
+    const profile = await client.get<GarminSocialProfile>(
+      "https://connectapi.garmin.com/userprofile-service/socialProfile"
+    );
+    displayName = profile?.displayName ?? null;
+  } catch {
+    // profile fetch failed — readiness/HRV still work without it
+  }
+
+  for (let i = 0; i < days; i++) {
+    const d = new Date();
+    d.setUTCDate(d.getUTCDate() - i);
+    const dateStr = d.toISOString().slice(0, 10); // YYYY-MM-DD
+
+    const data: Record<string, unknown> = {};
+
+    if (prefs.syncRecovery) {
+      // Training Readiness (only on supported watches)
+      try {
+        const tr = await client.get<GarminReadinessEntry[]>(
+          `https://connectapi.garmin.com/metrics-service/metrics/trainingreadiness/${dateStr}`
+        );
+        const entry = Array.isArray(tr) ? tr[0] : null;
+        if (entry?.score != null) {
+          data.trainingReadiness = Math.round(entry.score);
+          data.readinessLevel = entry.level ?? null;
+        }
+      } catch { /* not supported / no data for this day */ }
+
+      // HRV — last night's average + status
+      try {
+        const hrv = await client.get<GarminHRVResponse>(
+          `https://connectapi.garmin.com/hrv-service/hrv/${dateStr}`
+        );
+        if (hrv?.hrvSummary?.lastNightAvg != null) {
+          data.hrv = hrv.hrvSummary.lastNightAvg;
+          data.hrvStatus = hrv.hrvSummary.status ?? null;
+        }
+      } catch { /* no HRV data */ }
+
+      // Resting HR + Body Battery from the daily user summary
+      if (displayName) {
+        try {
+          const sum = await client.get<GarminUserSummary>(
+            `https://connectapi.garmin.com/usersummary-service/usersummary/daily/${encodeURIComponent(displayName)}?calendarDate=${dateStr}`
+          );
+          if (sum?.restingHeartRate != null) data.restingHR = sum.restingHeartRate;
+          const bb = sum?.bodyBatteryHighestValue ?? sum?.bodyBatteryMostRecentValue;
+          if (bb != null) data.bodyBattery = bb;
+        } catch { /* no summary */ }
+      }
+    }
+
+    if (prefs.syncSleep && displayName) {
+      try {
+        const sleep = await client.get<GarminSleepResponse>(
+          `https://connectapi.garmin.com/wellness-service/wellness/dailySleepData/${encodeURIComponent(displayName)}?date=${dateStr}&nonSleepBufferMinutes=60`
+        );
+        const dto = sleep?.dailySleepDTO;
+        if (dto?.sleepTimeSeconds != null && dto.sleepTimeSeconds > 0) {
+          data.totalSleepMin = Math.round(dto.sleepTimeSeconds / 60);
+          data.deepMin  = Math.round((dto.deepSleepSeconds  ?? 0) / 60);
+          data.lightMin = Math.round((dto.lightSleepSeconds ?? 0) / 60);
+          data.remMin   = Math.round((dto.remSleepSeconds   ?? 0) / 60);
+          data.awakeMin = Math.round((dto.awakeSleepSeconds ?? 0) / 60);
+          const score = dto.sleepScores?.overall?.value;
+          if (score != null) data.sleepScore = Math.round(score);
+        }
+      } catch { /* no sleep data */ }
+    }
+
+    if (Object.keys(data).length === 0) continue;
+
+    const dayDate = new Date(`${dateStr}T00:00:00Z`);
+    try {
+      await prisma.garminWellness.upsert({
+        where: { userId_date: { userId, date: dayDate } },
+        update: data,
+        create: { userId, date: dayDate, ...data },
+      });
+    } catch { /* one bad day never breaks the sync */ }
+  }
 }
 
 /** @deprecated use buildHRData — kept for any callers passing raw [timestamp_ms, bpm] pairs */

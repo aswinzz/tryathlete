@@ -29,8 +29,10 @@ export const DEFAULT_WHOOP_PREFS: WhoopDataPrefs = {
 
 export const DEFAULT_GARMIN_PREFS = {
   syncActivities: true,
-  syncRecovery:   false,
-  syncSleep:      false,
+  // Wellness (Training Readiness / HRV / sleep) syncs by default — the recovery
+  // endpoints prefer WHOOP when both sources exist, so this is safe for WHOOP users.
+  syncRecovery:   true,
+  syncSleep:      true,
 };
 
 export function parseDataPrefs(raw: string | null | undefined, defaults: WhoopDataPrefs): WhoopDataPrefs {

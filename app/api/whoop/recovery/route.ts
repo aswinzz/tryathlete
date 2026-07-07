@@ -24,5 +24,35 @@ export async function GET(req: NextRequest) {
     },
   });
 
-  return NextResponse.json({ records });
+  if (records.length > 0) return NextResponse.json({ records });
+
+  // No WHOOP data — fall back to Garmin wellness (Training Readiness / Body
+  // Battery / HRV / sleep) mapped into the exact same record shape.
+  const garmin = await prisma.garminWellness.findMany({
+    where: { userId, date: { gte: since } },
+    orderBy: { date: "desc" },
+  });
+
+  const mapped = garmin.map((g: {
+    id: string; date: Date;
+    trainingReadiness: number | null; bodyBattery: number | null;
+    hrv: number | null; restingHR: number | null; sleepScore: number | null;
+    totalSleepMin: number | null; remMin: number | null; deepMin: number | null;
+    lightMin: number | null; awakeMin: number | null;
+  }) => ({
+    id: g.id,
+    date: g.date,
+    recoveryScore: g.trainingReadiness ?? g.bodyBattery ?? null,
+    hrv: g.hrv,
+    restingHR: g.restingHR,
+    spo2: null,
+    totalSleepMin: g.totalSleepMin,
+    remMin: g.remMin, deepMin: g.deepMin, lightMin: g.lightMin, awakeMin: g.awakeMin,
+    sleepScore: g.sleepScore,
+    sleepEff: null,
+    strain: null, kilojoule: null, avgHR: null, maxHR: null,
+    source: "garmin",
+  }));
+
+  return NextResponse.json({ records: mapped });
 }

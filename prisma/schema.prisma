@@ -23,6 +23,7 @@ model User {
   connections     TrackerConnection[]
   workoutPlans    WorkoutPlan[]
   whoopRecoveries WhoopRecovery[]
+  garminWellness  GarminWellness[]
   pushTokens      DevicePushToken[]
 
   mcpToken    String?  @unique // auth token for MCP endpoint
@@ -83,6 +84,33 @@ model TrackerConnection {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, provider])
+}
+
+// ─── Garmin Wellness (Training Readiness / recovery) ─────────────────────────
+
+model GarminWellness {
+  id                String   @id @default(cuid())
+  userId            String
+  date              DateTime // calendar day, UTC midnight
+  trainingReadiness Int?     // 0–100 (watches that support it)
+  readinessLevel    String?  // e.g. "HIGH" | "MODERATE" | "LOW"
+  bodyBattery       Int?     // highest value of the day
+  hrv               Float?   // last-night average (ms)
+  hrvStatus         String?  // e.g. "BALANCED" | "UNBALANCED" | "LOW"
+  restingHR         Int?
+  sleepScore        Int?
+  totalSleepMin     Int?
+  remMin            Int?
+  deepMin           Int?
+  lightMin          Int?
+  awakeMin          Int?
+  rawData           String?
+  createdAt         DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId, date(sort: Desc)])
 }
 
 model DevicePushToken {
