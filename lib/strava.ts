@@ -14,6 +14,7 @@ import { prisma } from "./prisma";
 import type { RoutePoint } from "./routeUtils";
 import { downsample } from "./routeUtils";
 import { sendPushToUser } from "./push";
+import { reconcileActivity } from "./planReconciler";
 import { parseDataPrefs } from "./whoop";
 import { getHRZone } from "./utils";
 
@@ -406,6 +407,9 @@ export async function importSingleStravaActivity(userId: string, stravaActivityI
 
   console.log(`[strava] webhook: imported ${stravaId} → activity ${created.id}`);
 
+  // Auto-match against the active workout plan (fire-and-forget, never throws)
+  reconcileActivity(created.id, userId).catch(() => {});
+
   // Notify the user's iOS device(s)
   const distanceKm = act.distance > 0 ? ` · ${(act.distance / 1000).toFixed(1)} km` : "";
   sendPushToUser(userId, {
@@ -483,6 +487,9 @@ async function syncStravaActivities(userId: string, after: Date | null) {
           rawData:      JSON.stringify(act),
         },
       });
+
+      // Auto-match against the active workout plan (fire-and-forget, never throws)
+      reconcileActivity(created.id, userId).catch(() => {});
 
       // Fetch laps + HR stream (endurance with distance)
       if (act.distance > 0 && ["running", "cycling", "swimming"].includes(type)) {

@@ -12,6 +12,7 @@
 
 import { prisma } from "./prisma";
 import { sendPushToUser } from "./push";
+import { reconcileActivity } from "./planReconciler";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -340,6 +341,9 @@ async function syncWhoopWorkouts(userId: string) {
         rawData:     JSON.stringify(w),
       },
     });
+
+    // Auto-match against the active workout plan (fire-and-forget, never throws)
+    reconcileActivity(created.id, userId).catch(() => {});
 
     // Notify the user's iOS device(s)
     const durationMin = Math.round(durationS / 60);
