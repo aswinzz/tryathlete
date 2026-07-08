@@ -472,6 +472,7 @@ async function syncWhoopRecovery(userId: string) {
         awakeMin:      ms2min(sleep?.score?.stage_summary.total_awake_time_milli),
         sleepScore:    sleep?.score?.sleep_performance_percentage ? Math.round(sleep.score.sleep_performance_percentage) : null,
         sleepEff:      sleep?.score?.sleep_efficiency_percentage ?? null,
+        respRate:      sleep?.score?.respiratory_rate ?? null,
         // cycle / strain
         strain:        cycle.score?.strain        ?? null,
         kilojoule:     cycle.score?.kilojoule     ?? null,

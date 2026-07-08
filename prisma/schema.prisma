@@ -98,6 +98,10 @@ model GarminWellness {
   hrv               Float?   // last-night average (ms)
   hrvStatus         String?  // e.g. "BALANCED" | "UNBALANCED" | "LOW"
   restingHR         Int?
+  vo2Max            Float?   // running VO2 max
+  vo2MaxCycling     Float?
+  stressAvg         Int?     // 0–100 daily average stress
+  stressMax         Int?
   sleepScore        Int?
   totalSleepMin     Int?
   remMin            Int?
@@ -302,6 +306,7 @@ model WhoopRecovery {
   awakeMin      Int?
   sleepScore    Int?      // sleep_performance_percentage
   sleepEff      Float?    // sleep_efficiency_percentage
+  respRate      Float?    // respiratory_rate (breaths/min, from sleep)
   // Strain / Cycle
   strain        Float?    // 0–21
   kilojoule     Float?

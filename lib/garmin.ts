@@ -374,6 +374,16 @@ interface GarminSocialProfile {
   displayName?: string;
 }
 
+interface GarminMaxMetEntry {
+  generic?: { vo2MaxPreciseValue?: number | null; vo2MaxValue?: number | null };
+  cycling?: { vo2MaxPreciseValue?: number | null; vo2MaxValue?: number | null };
+}
+
+interface GarminStressResponse {
+  avgStressLevel?: number | null;
+  maxStressLevel?: number | null;
+}
+
 /**
  * Sync Garmin wellness data (Training Readiness, HRV, resting HR, Body Battery,
  * sleep) for the last `days` days into the GarminWellness table.
@@ -449,6 +459,31 @@ export async function syncGarminWellness(userId: string, days = 7) {
           if (bb != null) data.bodyBattery = bb;
         } catch { /* no summary */ }
       }
+
+      // VO2 max (running + cycling) — "maxmet" in Garmin's API
+      try {
+        const mm = await client.get<GarminMaxMetEntry[]>(
+          `https://connectapi.garmin.com/metrics-service/metrics/maxmet/daily/${dateStr}/${dateStr}`
+        );
+        const entry = Array.isArray(mm) ? mm[0] : null;
+        const running = entry?.generic?.vo2MaxPreciseValue ?? entry?.generic?.vo2MaxValue;
+        const cycling = entry?.cycling?.vo2MaxPreciseValue ?? entry?.cycling?.vo2MaxValue;
+        if (running != null) data.vo2Max = running;
+        if (cycling != null) data.vo2MaxCycling = cycling;
+      } catch { /* no VO2 max for this day */ }
+
+      // Daily stress (0–100)
+      try {
+        const stress = await client.get<GarminStressResponse>(
+          `https://connectapi.garmin.com/wellness-service/wellness/dailyStress/${dateStr}`
+        );
+        if (stress?.avgStressLevel != null && stress.avgStressLevel >= 0) {
+          data.stressAvg = Math.round(stress.avgStressLevel);
+        }
+        if (stress?.maxStressLevel != null && stress.maxStressLevel >= 0) {
+          data.stressMax = Math.round(stress.maxStressLevel);
+        }
+      } catch { /* no stress data */ }
     }
 
     if (prefs.syncSleep && displayName) {

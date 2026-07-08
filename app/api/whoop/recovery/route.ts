@@ -18,6 +18,7 @@ export async function GET(req: NextRequest) {
     select: {
       id: true, date: true,
       recoveryScore: true, hrv: true, restingHR: true, spo2: true,
+      skinTemp: true, respRate: true,
       totalSleepMin: true, remMin: true, deepMin: true, lightMin: true, awakeMin: true,
       sleepScore: true, sleepEff: true,
       strain: true, kilojoule: true, avgHR: true, maxHR: true,
@@ -39,18 +40,22 @@ export async function GET(req: NextRequest) {
     hrv: number | null; restingHR: number | null; sleepScore: number | null;
     totalSleepMin: number | null; remMin: number | null; deepMin: number | null;
     lightMin: number | null; awakeMin: number | null;
+    vo2Max: number | null; vo2MaxCycling: number | null;
+    stressAvg: number | null; stressMax: number | null;
   }) => ({
     id: g.id,
     date: g.date,
     recoveryScore: g.trainingReadiness ?? g.bodyBattery ?? null,
     hrv: g.hrv,
     restingHR: g.restingHR,
-    spo2: null,
+    spo2: null, skinTemp: null, respRate: null,
     totalSleepMin: g.totalSleepMin,
     remMin: g.remMin, deepMin: g.deepMin, lightMin: g.lightMin, awakeMin: g.awakeMin,
     sleepScore: g.sleepScore,
     sleepEff: null,
     strain: null, kilojoule: null, avgHR: null, maxHR: null,
+    vo2Max: g.vo2Max, vo2MaxCycling: g.vo2MaxCycling,
+    stressAvg: g.stressAvg, stressMax: g.stressMax,
     source: "garmin",
   }));
 
