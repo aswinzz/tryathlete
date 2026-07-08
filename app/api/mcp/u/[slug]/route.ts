@@ -289,12 +289,12 @@ const TOOLS = [
   // ── Wellness tools ─────────────────────────────────────────────────────────
   {
     name: "get_wellness_today",
-    description: "Get today's WHOOP wellness snapshot: recovery score (0–100), HRV, resting heart rate, sleep duration and quality, and daily strain. Use this before making any training recommendations to understand the athlete's current readiness. Returns null for each field if WHOOP is not connected or data has not synced yet.",
+    description: "Get today's wellness snapshot from WHOOP or Garmin: recovery score (0–100; WHOOP recovery, or Garmin Training Readiness / Body Battery), HRV, resting heart rate, sleep duration and quality, daily strain (WHOOP), VO2 max and stress (Garmin). Use this before making any training recommendations to understand the athlete's current readiness. The `source` field says which tracker supplied the data.",
     inputSchema: { type: "object", properties: {}, required: [] },
   },
   {
     name: "get_wellness_history",
-    description: "Get recent WHOOP wellness history (last N days) to identify trends in recovery, HRV, sleep and strain. Useful for spotting overtraining, improving adaptation, or planning peak/taper weeks.",
+    description: "Get recent wellness history (last N days) from WHOOP or Garmin to identify trends in recovery, HRV, sleep, strain (WHOOP), VO2 max and stress (Garmin). Useful for spotting overtraining, improving adaptation, or planning peak/taper weeks.",
     inputSchema: {
       type: "object",
       properties: {
@@ -848,12 +848,28 @@ async function callTool(
       const plannedWorkouts = plannedDays.reduce((s, d) => s + d.entries.length, 0);
       const completedDays   = days.filter((d) => d.completed).length;
 
-      // WHOOP recovery data for this week
-      const whoopRecords = await prisma.whoopRecovery.findMany({
-        where: { userId, date: { gte: monday, lte: sunday } },
-        orderBy: { date: "asc" },
-        select: { date: true, recoveryScore: true, hrv: true, strain: true, totalSleepMin: true },
-      });
+      // Recovery data for this week — WHOOP first, Garmin wellness as fallback
+      let whoopRecords: { date: Date; recoveryScore: number | null; hrv: number | null; strain: number | null; totalSleepMin: number | null }[] =
+        await prisma.whoopRecovery.findMany({
+          where: { userId, date: { gte: monday, lte: sunday } },
+          orderBy: { date: "asc" },
+          select: { date: true, recoveryScore: true, hrv: true, strain: true, totalSleepMin: true },
+        });
+
+      if (whoopRecords.length === 0) {
+        const gRows = await prisma.garminWellness.findMany({
+          where: { userId, date: { gte: monday, lte: sunday } },
+          orderBy: { date: "asc" },
+          select: { date: true, trainingReadiness: true, bodyBattery: true, hrv: true, totalSleepMin: true },
+        });
+        whoopRecords = gRows.map((g: { date: Date; trainingReadiness: number | null; bodyBattery: number | null; hrv: number | null; totalSleepMin: number | null }) => ({
+          date: g.date,
+          recoveryScore: g.trainingReadiness ?? g.bodyBattery ?? null,
+          hrv: g.hrv,
+          strain: null,
+          totalSleepMin: g.totalSleepMin,
+        }));
+      }
 
       return {
         week: {
@@ -959,72 +975,120 @@ async function callTool(
     // ── Wellness tool implementations ────────────────────────────────────────
 
     case "get_wellness_today": {
-      const whoopConn = await prisma.trackerConnection.findUnique({
-        where: { userId_provider: { userId, provider: "whoop" } },
-        select: { id: true, lastSyncAt: true },
+      const conns = await prisma.trackerConnection.findMany({
+        where: { userId, provider: { in: ["whoop", "garmin"] } },
+        select: { provider: true, lastSyncAt: true },
       });
+      const whoopConn  = conns.find((c: { provider: string }) => c.provider === "whoop");
+      const garminConn = conns.find((c: { provider: string }) => c.provider === "garmin");
 
-      if (!whoopConn) {
+      if (!whoopConn && !garminConn) {
         return {
           whoopConnected: false,
-          message: "WHOOP is not connected. No wellness data available.",
+          garminConnected: false,
+          message: "No wellness tracker connected (WHOOP or Garmin). No wellness data available.",
         };
       }
 
-      const record = await prisma.whoopRecovery.findFirst({
-        where: { userId },
-        orderBy: { date: "desc" },
-      });
-
-      if (!record) {
-        return {
-          whoopConnected: true,
-          lastSyncAt: whoopConn.lastSyncAt,
-          message: "WHOOP is connected but no recovery data has synced yet.",
-        };
-      }
-
-      const score = record.recoveryScore;
-      const readiness =
+      const readinessLabel = (score: number | null) =>
         score === null ? "unknown" :
         score >= 67    ? "optimal — green light for hard training" :
         score >= 34    ? "moderate — steady/aerobic work recommended" :
                          "low — prioritise recovery, avoid intensity";
 
-      const totalSleepH = record.totalSleepMin
-        ? `${Math.floor(record.totalSleepMin / 60)}h ${record.totalSleepMin % 60}m`
+      const fmtSleep = (min: number | null) =>
+        min ? `${Math.floor(min / 60)}h ${min % 60}m` : null;
+
+      // ── WHOOP first ──
+      const record = whoopConn
+        ? await prisma.whoopRecovery.findFirst({ where: { userId }, orderBy: { date: "desc" } })
         : null;
 
+      if (record) {
+        return {
+          source: "whoop",
+          whoopConnected: true,
+          garminConnected: !!garminConn,
+          date: record.date.toISOString().split("T")[0],
+          lastSyncAt: whoopConn?.lastSyncAt,
+          recovery: {
+            score: record.recoveryScore,
+            readiness: readinessLabel(record.recoveryScore),
+            hrv_ms: record.hrv !== null ? Math.round(record.hrv) : null,
+            restingHR_bpm: record.restingHR,
+            spo2_pct: record.spo2,
+            skinTemp_c: record.skinTemp,
+            respRate_perMin: record.respRate,
+          },
+          sleep: {
+            totalDuration: fmtSleep(record.totalSleepMin),
+            totalMinutes: record.totalSleepMin,
+            performanceScore: record.sleepScore,
+            efficiency_pct: record.sleepEff,
+            stages: {
+              deep_min:  record.deepMin,
+              rem_min:   record.remMin,
+              light_min: record.lightMin,
+              awake_min: record.awakeMin,
+            },
+          },
+          strain: {
+            score: record.strain,
+            scale: "0–21 (higher = more cardiovascular load)",
+            kilojoule: record.kilojoule,
+            avgHR_bpm: record.avgHR,
+            maxHR_bpm: record.maxHR,
+          },
+        };
+      }
+
+      // ── Garmin fallback (Training Readiness / Body Battery / VO2 max / stress) ──
+      const g = garminConn
+        ? await prisma.garminWellness.findFirst({ where: { userId }, orderBy: { date: "desc" } })
+        : null;
+
+      if (!g) {
+        return {
+          whoopConnected: !!whoopConn,
+          garminConnected: !!garminConn,
+          lastSyncAt: whoopConn?.lastSyncAt ?? garminConn?.lastSyncAt,
+          message: "Tracker is connected but no wellness data has synced yet.",
+        };
+      }
+
+      const gScore = g.trainingReadiness ?? g.bodyBattery ?? null;
       return {
-        whoopConnected: true,
-        date: record.date.toISOString().split("T")[0],
-        lastSyncAt: whoopConn.lastSyncAt,
+        source: "garmin",
+        whoopConnected: !!whoopConn,
+        garminConnected: true,
+        date: g.date.toISOString().split("T")[0],
+        lastSyncAt: garminConn?.lastSyncAt,
         recovery: {
-          score: record.recoveryScore,
-          readiness,
-          hrv_ms: record.hrv !== null ? Math.round(record.hrv) : null,
-          restingHR_bpm: record.restingHR,
-          spo2_pct: record.spo2,
-          skinTemp_c: record.skinTemp,
+          score: gScore,
+          scoreBasis: g.trainingReadiness !== null ? "training_readiness" : "body_battery",
+          readiness: readinessLabel(gScore),
+          readinessLevel: g.readinessLevel,
+          hrv_ms: g.hrv !== null ? Math.round(g.hrv) : null,
+          hrvStatus: g.hrvStatus,
+          restingHR_bpm: g.restingHR,
+          bodyBattery: g.bodyBattery,
+          stressAvg: g.stressAvg,
+          stressMax: g.stressMax,
+        },
+        fitness: {
+          vo2max_running: g.vo2Max,
+          vo2max_cycling: g.vo2MaxCycling,
         },
         sleep: {
-          totalDuration: totalSleepH,
-          totalMinutes: record.totalSleepMin,
-          performanceScore: record.sleepScore,
-          efficiency_pct: record.sleepEff,
+          totalDuration: fmtSleep(g.totalSleepMin),
+          totalMinutes: g.totalSleepMin,
+          performanceScore: g.sleepScore,
           stages: {
-            deep_min:  record.deepMin,
-            rem_min:   record.remMin,
-            light_min: record.lightMin,
-            awake_min: record.awakeMin,
+            deep_min:  g.deepMin,
+            rem_min:   g.remMin,
+            light_min: g.lightMin,
+            awake_min: g.awakeMin,
           },
-        },
-        strain: {
-          score: record.strain,
-          scale: "0–21 (higher = more cardiovascular load)",
-          kilojoule: record.kilojoule,
-          avgHR_bpm: record.avgHR,
-          maxHR_bpm: record.maxHR,
         },
       };
     }
@@ -1032,26 +1096,74 @@ async function callTool(
     case "get_wellness_history": {
       const limit = Math.min(Math.max(1, Number(args.days) || 7), 30);
 
-      const whoopConn = await prisma.trackerConnection.findUnique({
-        where: { userId_provider: { userId, provider: "whoop" } },
-        select: { id: true },
+      const wConns = await prisma.trackerConnection.findMany({
+        where: { userId, provider: { in: ["whoop", "garmin"] } },
+        select: { provider: true },
       });
+      const hasWhoop  = wConns.some((c: { provider: string }) => c.provider === "whoop");
+      const hasGarmin = wConns.some((c: { provider: string }) => c.provider === "garmin");
 
-      if (!whoopConn) {
-        return { whoopConnected: false, records: [], message: "WHOOP is not connected." };
+      if (!hasWhoop && !hasGarmin) {
+        return { whoopConnected: false, garminConnected: false, records: [], message: "No wellness tracker connected (WHOOP or Garmin)." };
       }
 
-      const records = await prisma.whoopRecovery.findMany({
-        where: { userId },
-        orderBy: { date: "desc" },
-        take: limit,
-        select: {
-          date: true, recoveryScore: true, hrv: true, restingHR: true,
-          totalSleepMin: true, sleepScore: true, sleepEff: true,
-          strain: true, avgHR: true, maxHR: true,
-          deepMin: true, remMin: true, lightMin: true,
-        },
-      });
+      // Normalized row shape shared by both sources
+      type WellnessRow = {
+        date: Date; recoveryScore: number | null; hrv: number | null; restingHR: number | null;
+        totalSleepMin: number | null; sleepScore: number | null; sleepEff: number | null;
+        strain: number | null; avgHR: number | null; maxHR: number | null;
+        deepMin: number | null; remMin: number | null; lightMin: number | null;
+        respRate: number | null;
+        vo2Max: number | null; vo2MaxCycling: number | null; stressAvg: number | null;
+        source: string;
+      };
+
+      let records: WellnessRow[] = [];
+      let source = "whoop";
+
+      if (hasWhoop) {
+        const whoopRows = await prisma.whoopRecovery.findMany({
+          where: { userId },
+          orderBy: { date: "desc" },
+          take: limit,
+          select: {
+            date: true, recoveryScore: true, hrv: true, restingHR: true,
+            totalSleepMin: true, sleepScore: true, sleepEff: true,
+            strain: true, avgHR: true, maxHR: true,
+            deepMin: true, remMin: true, lightMin: true, respRate: true,
+          },
+        });
+        records = whoopRows.map((r: Omit<WellnessRow, "vo2Max" | "vo2MaxCycling" | "stressAvg" | "source">) => ({
+          ...r, vo2Max: null, vo2MaxCycling: null, stressAvg: null, source: "whoop",
+        }));
+      }
+
+      // Garmin fallback when WHOOP has nothing
+      if (records.length === 0 && hasGarmin) {
+        source = "garmin";
+        const gRows = await prisma.garminWellness.findMany({
+          where: { userId },
+          orderBy: { date: "desc" },
+          take: limit,
+        });
+        records = gRows.map((g: {
+          date: Date; trainingReadiness: number | null; bodyBattery: number | null;
+          hrv: number | null; restingHR: number | null; totalSleepMin: number | null;
+          sleepScore: number | null; deepMin: number | null; remMin: number | null;
+          lightMin: number | null; vo2Max: number | null; vo2MaxCycling: number | null;
+          stressAvg: number | null;
+        }) => ({
+          date: g.date,
+          recoveryScore: g.trainingReadiness ?? g.bodyBattery ?? null,
+          hrv: g.hrv, restingHR: g.restingHR,
+          totalSleepMin: g.totalSleepMin, sleepScore: g.sleepScore, sleepEff: null,
+          strain: null, avgHR: null, maxHR: null,
+          deepMin: g.deepMin, remMin: g.remMin, lightMin: g.lightMin,
+          respRate: null,
+          vo2Max: g.vo2Max, vo2MaxCycling: g.vo2MaxCycling, stressAvg: g.stressAvg,
+          source: "garmin",
+        }));
+      }
 
       const scored = records.filter((r) => r.recoveryScore !== null);
       const avgRecovery = scored.length
@@ -1075,14 +1187,21 @@ async function callTool(
         })();
 
       return {
-        whoopConnected: true,
+        whoopConnected: hasWhoop,
+        garminConnected: hasGarmin,
         periodDays: limit,
+        source,
         summary: { avgRecoveryScore: avgRecovery, avgHRV_ms: avgHRV, trend },
         records: records.map((r) => ({
           date: r.date.toISOString().split("T")[0],
+          source: r.source,
           recoveryScore: r.recoveryScore,
           hrv_ms: r.hrv !== null ? Math.round(r.hrv) : null,
           restingHR_bpm: r.restingHR,
+          respRate_perMin: r.respRate,
+          vo2max_running: r.vo2Max,
+          vo2max_cycling: r.vo2MaxCycling,
+          stressAvg: r.stressAvg,
           sleep: {
             totalMinutes: r.totalSleepMin,
             performanceScore: r.sleepScore,
