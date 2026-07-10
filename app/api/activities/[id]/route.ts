@@ -12,7 +12,13 @@ export async function GET(
   const { id } = await params;
   const activity = await prisma.activity.findFirst({
     where: { id, userId },
-    include: { laps: { orderBy: { lapIndex: "asc" } } },
+    include: {
+      laps: { orderBy: { lapIndex: "asc" } },
+      exercises: {
+        orderBy: { orderIndex: "asc" },
+        include: { sets: { orderBy: { setIndex: "asc" } } },
+      },
+    },
     // rawData is a write-only blob (full Garmin/Strava JSON, often 100s of KB)
     // that no client reads — omitting it drastically shrinks the response.
     omit: { rawData: true },

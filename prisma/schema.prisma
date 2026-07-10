@@ -158,9 +158,10 @@ model Activity {
   hrZones     String?  // JSON {z1: secs, z2: secs, z3: secs, z4: secs, z5: secs}
   createdAt   DateTime @default(now())
 
-  user  User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  laps  ActivityLap[]
-  links PlanActivityLink[]
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  laps      ActivityLap[]
+  links     PlanActivityLink[]
+  exercises ExerciseEntry[]
 
   // Every list/feed/profile query filters by userId and sorts by startTime
   @@index([userId, startTime(sort: Desc)])
@@ -276,7 +277,10 @@ model WorkoutEntry {
 
 model ExerciseEntry {
   id             String  @id @default(cuid())
-  entryId        String
+  // An exercise belongs to EITHER a plan entry (planned session) OR an
+  // activity (ad-hoc log / synced strength session) — exactly one is set.
+  entryId        String?
+  activityId     String?
   name           String  // e.g. "Back Squat"
   orderIndex     Int     @default(0)
   targetSets     Int?
@@ -286,10 +290,12 @@ model ExerciseEntry {
   restSec        Int?
   notes          String? // technique cues, tempo, etc.
 
-  entry WorkoutEntry  @relation(fields: [entryId], references: [id], onDelete: Cascade)
-  sets  ExerciseSet[]
+  entry    WorkoutEntry? @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  activity Activity?     @relation(fields: [activityId], references: [id], onDelete: Cascade)
+  sets     ExerciseSet[]
 
   @@index([entryId])
+  @@index([activityId])
 }
 
 model ExerciseSet {
