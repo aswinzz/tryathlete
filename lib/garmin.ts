@@ -63,7 +63,16 @@ export interface GarminDetailsResponse {
 export async function syncGarminActivities(userId: string) {
   const client = await getGarminClient(userId);
 
-  // Paginate through all Garmin history (newest first).
+  // Has this connection completed a sync before? If so, a fully-existing
+  // FIRST page (newest activities) means we're already caught up — no need
+  // to fetch a second page like the initial backfill does.
+  const conn = await prisma.trackerConnection.findUnique({
+    where: { userId_provider: { userId, provider: "garmin" } },
+    select: { lastSyncAt: true },
+  });
+  const hadPriorSync = conn?.lastSyncAt != null;
+
+  // Paginate through Garmin history (newest first).
   // Stop early once we hit a page where every activity already exists in DB
   // (meaning we've caught up with previously synced data).
   const PAGE_SIZE = 100;
@@ -85,8 +94,10 @@ export async function syncGarminActivities(userId: string) {
     allActivities = allActivities.concat(page);
     start += page.length;
 
-    // If the whole page is already in DB and we have some data, we're caught up
-    if (allExist && start > PAGE_SIZE) break;
+    // Caught up: on incremental syncs a fully-existing first page is enough;
+    // during the initial backfill require at least two pages so an interrupted
+    // first sync can still resume.
+    if (allExist && (hadPriorSync || start > PAGE_SIZE)) break;
     if (page.length < PAGE_SIZE) break; // Last page
   }
 

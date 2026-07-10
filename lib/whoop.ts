@@ -168,13 +168,17 @@ async function whoopFetchAll<T>(
   userId: string,
   path: string,
   limit = 25,
-  token?: string
+  token?: string,
+  since?: Date | null
 ): Promise<T[]> {
   const results: T[] = [];
   let nextToken: string | undefined;
 
   do {
     const query = new URLSearchParams({ limit: String(limit) });
+    // Incremental sync: WHOOP supports a `start` ISO timestamp filter.
+    // Without it every sync paginated the user's ENTIRE history.
+    if (since) query.set("start", since.toISOString());
     if (nextToken) query.set("nextToken", nextToken);
     const page = await whoopFetch<WhoopPage<T>>(userId, `${path}?${query}`, token);
     results.push(...(page.records ?? []));
@@ -182,6 +186,17 @@ async function whoopFetchAll<T>(
   } while (nextToken);
 
   return results;
+}
+
+/**
+ * Incremental window for WHOOP fetches: last sync minus 48h.
+ * The buffer covers records that were still PENDING_SCORE at the previous
+ * sync and got scored later; duplicates are skipped by unique constraints.
+ * Null (full history) on first sync.
+ */
+function whoopSince(lastSyncAt: Date | null): Date | null {
+  if (!lastSyncAt) return null;
+  return new Date(lastSyncAt.getTime() - 48 * 60 * 60 * 1000);
 }
 
 // ─── User profile ─────────────────────────────────────────────────────────────
@@ -227,10 +242,13 @@ export async function syncWhoopData(userId: string) {
   const prefs = parseDataPrefs(conn.dataPrefs, DEFAULT_WHOOP_PREFS);
   const errors: string[] = [];
 
+  // Incremental window — only fetch records newer than last sync (with buffer)
+  const since = whoopSince(conn.lastSyncAt);
+
   // ── Activities (workouts) ─────────────────────────────────────────────────
   if (prefs.syncActivities) {
     try {
-      await syncWhoopWorkouts(userId);
+      await syncWhoopWorkouts(userId, since);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error("[whoop] workout sync failed:", msg);
@@ -241,7 +259,7 @@ export async function syncWhoopData(userId: string) {
   // ── Recovery + Sleep + Cycle (always fetched together from cycles) ────────
   if (prefs.syncRecovery || prefs.syncSleep) {
     try {
-      await syncWhoopRecovery(userId);
+      await syncWhoopRecovery(userId, since);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       console.error("[whoop] recovery sync failed:", msg);
@@ -308,9 +326,9 @@ const WHOOP_SPORT_MAP: Record<number, string> = {
   // everything else falls through to "other"
 };
 
-async function syncWhoopWorkouts(userId: string) {
+async function syncWhoopWorkouts(userId: string, since: Date | null = null) {
   const token = await getValidWhoopToken(userId);
-  const workouts = await whoopFetchAll<WhoopWorkout>(userId, "/activity/workout", 25, token);
+  const workouts = await whoopFetchAll<WhoopWorkout>(userId, "/activity/workout", 25, token, since);
 
   for (const w of workouts) {
     const whoopId = String(w.id);
@@ -420,17 +438,17 @@ interface WhoopSleepRecord {
   };
 }
 
-async function syncWhoopRecovery(userId: string) {
+async function syncWhoopRecovery(userId: string, since: Date | null = null) {
   // Pre-fetch a valid token once so all three parallel calls share it,
   // preventing a race where each branch tries to refresh the single-use
   // refresh token simultaneously.
   const token = await getValidWhoopToken(userId);
 
-  // Fetch cycles, recoveries and sleeps in parallel
+  // Fetch cycles, recoveries and sleeps in parallel (incremental via `since`)
   const [cycles, recoveries, sleeps] = await Promise.all([
-    whoopFetchAll<WhoopCycle>(userId, "/cycle", 25, token),
-    whoopFetchAll<WhoopRecoveryRecord>(userId, "/recovery", 25, token),
-    whoopFetchAll<WhoopSleepRecord>(userId, "/activity/sleep", 25, token),
+    whoopFetchAll<WhoopCycle>(userId, "/cycle", 25, token, since),
+    whoopFetchAll<WhoopRecoveryRecord>(userId, "/recovery", 25, token, since),
+    whoopFetchAll<WhoopSleepRecord>(userId, "/activity/sleep", 25, token, since),
   ]);
 
   // Index by cycle id for fast lookup
