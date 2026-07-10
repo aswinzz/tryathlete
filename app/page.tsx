@@ -6,6 +6,8 @@ import {
 } from "framer-motion";
 import { useEffect, useRef } from "react";
 
+const TESTFLIGHT_URL = "https://testflight.apple.com/join/Svqehhxc";
+
 // ── Animation helpers ─────────────────────────────────────
 
 const fadeUp: Variants = {
@@ -87,9 +89,14 @@ export default function LandingPage() {
             <a href="#how" className="hover:text-[#c8ff00] transition-colors">How it works</a>
             <a href="#features" className="hover:text-[#c8ff00] transition-colors">Features</a>
           </div>
-          <span className="bg-[#c8ff00]/10 text-[#c8ff00] text-xs font-bold px-4 py-2 rounded-lg border border-[#c8ff00]/20">
-            Invite Only
-          </span>
+          <a
+            href={TESTFLIGHT_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="bg-[#c8ff00]/10 text-[#c8ff00] text-xs font-bold px-4 py-2 rounded-lg border border-[#c8ff00]/20 hover:bg-[#c8ff00]/20 transition-colors"
+          >
+            Join the Beta
+          </a>
         </div>
       </motion.nav>
 
@@ -199,9 +206,14 @@ export default function LandingPage() {
             transition={{ delay: 1.2, duration: 0.7 }}
             className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8"
           >
-            <span className="bg-[#c8ff00] text-[#0a0a0a] font-bold px-8 py-4 rounded-xl text-base opacity-40 cursor-not-allowed select-none w-full sm:w-auto">
-              Invite Only
-            </span>
+            <a
+              href={TESTFLIGHT_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="bg-[#c8ff00] text-[#0a0a0a] font-bold px-8 py-4 rounded-xl text-base hover:bg-[#d9ff4d] transition-colors shadow-[0_0_30px_rgba(200,255,0,0.25)] w-full sm:w-auto"
+            >
+              Join the Beta on TestFlight →
+            </a>
             <a
               href="#how"
               className="bg-white/6 text-white font-medium px-8 py-4 rounded-xl text-base hover:bg-white/10 hover:border-[#c8ff00]/30 transition-colors w-full sm:w-auto border border-white/10"
@@ -216,7 +228,7 @@ export default function LandingPage() {
             transition={{ delay: 1.35 }}
             className="text-sm text-[#555]"
           >
-            iOS · Invite Only · Free Beta
+            iOS · Free Beta via TestFlight
           </motion.p>
 
           {/* Mock AI chat */}
@@ -423,6 +435,28 @@ export default function LandingPage() {
                 </TiltCard>
               </Reveal>
             ))}
+
+            {/* Strength tracking — featured full-width card */}
+            <Reveal className="md:col-span-2">
+              <TiltCard className="lp-glow-card bg-[#111] border border-[#c8ff00]/15 rounded-2xl p-6 flex flex-col sm:flex-row gap-5 items-start">
+                <span className="text-2xl flex-shrink-0 mt-0.5">🏋️</span>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+                    <h3 className="font-bold text-white">Strength session tracking</h3>
+                    <span className="text-[9px] font-bold tracking-widest uppercase text-[#c8ff00] bg-[#c8ff00]/10 border border-[#c8ff00]/20 px-2 py-0.5 rounded-full">New</span>
+                  </div>
+                  <p className="text-[#888] text-sm leading-relaxed">
+                    Plan exercises with target sets, reps, and weight — or let your AI program them from your
+                    past lifts. Log during the workout, and when your watch session syncs it all merges into
+                    one activity: your sets next to your heart rate. Your AI reviews planned vs. actual and
+                    progresses the load.
+                  </p>
+                </div>
+                <div className="hidden sm:flex flex-shrink-0 items-center justify-center w-32 h-20">
+                  <StrengthMini />
+                </div>
+              </TiltCard>
+            </Reveal>
           </div>
         </div>
       </section>
@@ -439,23 +473,27 @@ export default function LandingPage() {
           <Reveal>
             <div className="lp-glow-card lp-scanline relative bg-[#111] border border-white/6 rounded-3xl p-10 md:p-16">
               <Corners />
-              <p className="text-xs font-bold text-[#c8ff00] tracking-[0.2em] uppercase mb-6">iOS · Invite Only Beta</p>
+              <p className="text-xs font-bold text-[#c8ff00] tracking-[0.2em] uppercase mb-6">iOS · Free Beta</p>
               <h2 className="text-3xl md:text-4xl font-black mb-4 leading-tight">
                 Stop asking your AI to guess.
                 <br />
                 Give it real training data.
               </h2>
               <p className="text-[#888] leading-relaxed mb-8">
-                Currently available by invite only. If you train with data and use AI,
+                Free beta, open now. If you train with data and use AI,
                 this is built for you.
               </p>
               <a
-                href="mailto:aswinvb.dev@gmail.com?subject=TryAthlete%20invite"
-                className="inline-block bg-[#c8ff00] text-[#0a0a0a] font-bold px-8 py-4 rounded-xl text-base hover:bg-[#d9ff4d] transition-colors"
+                href={TESTFLIGHT_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block bg-[#c8ff00] text-[#0a0a0a] font-bold px-8 py-4 rounded-xl text-base hover:bg-[#d9ff4d] transition-colors shadow-[0_0_30px_rgba(200,255,0,0.2)]"
               >
-                Request an invite →
+                Join the Beta on TestFlight →
               </a>
-              <p className="text-[#555] text-xs mt-4 font-mono">aswinvb.dev@gmail.com</p>
+              <p className="text-[#555] text-xs mt-4 font-mono">
+                questions? <a href="mailto:aswinvb.dev@gmail.com" className="hover:text-[#c8ff00] transition-colors">aswinvb.dev@gmail.com</a>
+              </p>
             </div>
           </Reveal>
         </div>
@@ -475,7 +513,7 @@ export default function LandingPage() {
             >
               aswinvb.dev@gmail.com
             </a>
-            <p className="text-[#555] text-sm">© 2026 TryAthlete · iOS Invite Only Beta</p>
+            <p className="text-[#555] text-sm">© 2026 TryAthlete · iOS Free Beta</p>
           </div>
         </div>
       </footer>
@@ -675,6 +713,30 @@ function RecoveryMini() {
         transition={{ duration: 3.6, times: [0, 0.7, 1], repeat: Infinity, ease: "easeInOut" }}
       />
     </svg>
+  );
+}
+
+/** Sets checking off one by one — strength logging. */
+function StrengthMini() {
+  const sets = ["8 × 60kg", "8 × 62.5kg", "7 × 65kg"];
+  return (
+    <div className="flex flex-col gap-1.5 w-28 font-mono">
+      {sets.map((s, i) => (
+        <motion.div
+          key={i}
+          className="flex items-center gap-1.5 text-[9px] text-[#888]"
+          animate={{ opacity: [0.25, 1, 1, 0.25] }}
+          transition={{ duration: 4.5, times: [0, 0.15, 0.85, 1], repeat: Infinity, delay: i * 0.9 }}
+        >
+          <motion.span
+            className="w-2.5 h-2.5 rounded-full border border-[#c8ff00] flex-shrink-0"
+            animate={{ backgroundColor: ["rgba(200,255,0,0)", "rgba(200,255,0,1)", "rgba(200,255,0,1)", "rgba(200,255,0,0)"] }}
+            transition={{ duration: 4.5, times: [0, 0.2, 0.85, 1], repeat: Infinity, delay: i * 0.9 }}
+          />
+          SET {i + 1} · {s}
+        </motion.div>
+      ))}
+    </div>
   );
 }
 
