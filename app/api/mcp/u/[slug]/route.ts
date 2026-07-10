@@ -193,6 +193,67 @@ const TOOLS = [
     },
   },
   {
+    name: "set_entry_exercises",
+    description: "Set the planned exercises for a strength (or other) workout entry: exercise name, target sets, reps, weight, RPE, rest, and notes. Replaces the entry's planned exercise list — existing exercises are matched by name and updated (their logged sets are preserved); exercises with logged sets are never deleted. Use get_exercise_history first to progress loads based on past performance.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        planId: { type: "string", description: "Plan ID or 'active'" },
+        weekNumber: { type: "number" },
+        dayOfWeek: { type: "number", description: "1=Monday … 7=Sunday" },
+        entryTitle: { type: "string", description: "Title of the entry (matched exactly)" },
+        exercises: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              name: { type: "string", description: "e.g. 'Back Squat'" },
+              targetSets: { type: "number" },
+              targetReps: { type: "string", description: "'8' or a range like '8-10'" },
+              targetWeightKg: { type: "number" },
+              targetRpe: { type: "number", description: "Planned effort 1–10" },
+              restSec: { type: "number" },
+              notes: { type: "string", description: "Tempo, technique cues, etc." },
+            },
+            required: ["name"],
+          },
+        },
+      },
+      required: ["planId", "weekNumber", "dayOfWeek", "entryTitle", "exercises"],
+    },
+  },
+  {
+    name: "log_exercise_set",
+    description: "Log (or correct) an actual performed set for an exercise — reps, weight, RPE. Use when the athlete tells you what they lifted. Upserts by set number, so re-logging set 2 updates it.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        planId: { type: "string", description: "Plan ID or 'active'" },
+        weekNumber: { type: "number" },
+        dayOfWeek: { type: "number", description: "1=Monday … 7=Sunday" },
+        entryTitle: { type: "string" },
+        exerciseName: { type: "string" },
+        setIndex: { type: "number", description: "1-based set number" },
+        reps: { type: "number" },
+        weightKg: { type: "number" },
+        rpe: { type: "number" },
+      },
+      required: ["planId", "weekNumber", "dayOfWeek", "entryTitle", "exerciseName", "setIndex"],
+    },
+  },
+  {
+    name: "get_exercise_history",
+    description: "Get recent performances of a named exercise (e.g. 'Back Squat') across all plans: planned targets vs actually logged sets per session, newest first. Essential for progressing load week over week.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        exerciseName: { type: "string", description: "Matched case-insensitively, partial match allowed" },
+        limit: { type: "number", description: "Max sessions to return (default 5, max 20)" },
+      },
+      required: ["exerciseName"],
+    },
+  },
+  {
     name: "create_week",
     description: "Create a full week with all its days and workout entries in a single call. Prefer this over calling add_week + add_day + add_entry separately.",
     inputSchema: {
@@ -362,17 +423,38 @@ async function callTool(
 ): Promise<unknown> {
 
   // Helper: resolve planId (supports "active")
+  const ENTRY_INCLUDE = {
+    orderBy: { orderIndex: "asc" as const },
+    include: {
+      exercises: {
+        orderBy: { orderIndex: "asc" as const },
+        include: { sets: { orderBy: { setIndex: "asc" as const } } },
+      },
+    },
+  };
+
   async function resolvePlan(planId: string) {
     if (planId === "active") {
       return prisma.workoutPlan.findFirst({
         where: { userId, isActive: true },
-        include: { weeks: { orderBy: { weekNumber: "asc" }, include: { days: { orderBy: { dayOfWeek: "asc" }, include: { entries: { orderBy: { orderIndex: "asc" } } } } } } },
+        include: { weeks: { orderBy: { weekNumber: "asc" }, include: { days: { orderBy: { dayOfWeek: "asc" }, include: { entries: ENTRY_INCLUDE } } } } },
       });
     }
     return prisma.workoutPlan.findFirst({
       where: { id: planId as string, userId },
-      include: { weeks: { orderBy: { weekNumber: "asc" }, include: { days: { orderBy: { dayOfWeek: "asc" }, include: { entries: { orderBy: { orderIndex: "asc" } } } } } } },
+      include: { weeks: { orderBy: { weekNumber: "asc" }, include: { days: { orderBy: { dayOfWeek: "asc" }, include: { entries: ENTRY_INCLUDE } } } } },
     });
+  }
+
+  // Helper: turn "active" into a concrete plan id
+  async function resolvePlanIdOrActive(planId: string): Promise<string> {
+    if (planId !== "active") return planId;
+    const p = await prisma.workoutPlan.findFirst({
+      where: { userId, isActive: true },
+      select: { id: true },
+    });
+    if (!p) throw new Error("No active plan");
+    return p.id;
   }
 
   // Helper: find week by number
@@ -542,6 +624,158 @@ async function callTool(
       });
       const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
       return { message: `${DOW[day.dayOfWeek - 1]} of week ${week.weekNumber} marked as completed ✅` };
+    }
+
+    // ── Strength exercise tools ───────────────────────────────────────────────
+
+    case "set_entry_exercises": {
+      const planId = await resolvePlanIdOrActive(args.planId as string);
+      const { day } = await resolveDay(planId, args.weekNumber as number, args.dayOfWeek as number);
+      if (!day) throw new Error("Day not found");
+      const entry = await prisma.workoutEntry.findFirst({
+        where: { dayId: day.id, title: args.entryTitle as string },
+      });
+      if (!entry) throw new Error(`Entry "${args.entryTitle}" not found`);
+
+      const list = args.exercises as {
+        name: string; targetSets?: number; targetReps?: string;
+        targetWeightKg?: number; targetRpe?: number; restSec?: number; notes?: string;
+      }[];
+      if (!Array.isArray(list) || list.length === 0) throw new Error("exercises array is required");
+
+      const existing = await prisma.exerciseEntry.findMany({
+        where: { entryId: entry.id },
+        include: { _count: { select: { sets: true } } },
+      });
+      const byName = new Map<string, { id: string; name: string }>(
+        existing.map((e: { id: string; name: string }) =>
+          [e.name.trim().toLowerCase(), e] as [string, { id: string; name: string }]
+        )
+      );
+
+      const keptIds = new Set<string>();
+      for (let i = 0; i < list.length; i++) {
+        const item = list[i];
+        if (!item.name?.trim()) throw new Error("every exercise needs a name");
+        const data = {
+          name: item.name.trim(),
+          orderIndex: i,
+          targetSets:     item.targetSets     ?? null,
+          targetReps:     item.targetReps     ?? null,
+          targetWeightKg: item.targetWeightKg ?? null,
+          targetRpe:      item.targetRpe      ?? null,
+          restSec:        item.restSec        ?? null,
+          notes:          item.notes          ?? null,
+        };
+        const match = byName.get(item.name.trim().toLowerCase());
+        if (match) {
+          keptIds.add(match.id);
+          await prisma.exerciseEntry.update({ where: { id: match.id }, data });
+        } else {
+          const created = await prisma.exerciseEntry.create({ data: { entryId: entry.id, ...data } });
+          keptIds.add(created.id);
+        }
+      }
+
+      const removable = existing
+        .filter((e: { id: string; _count: { sets: number } }) => !keptIds.has(e.id) && e._count.sets === 0)
+        .map((e: { id: string }) => e.id);
+      if (removable.length > 0) {
+        await prisma.exerciseEntry.deleteMany({ where: { id: { in: removable } } });
+      }
+
+      return {
+        message: `"${entry.title}" now has ${list.length} planned exercise(s)`,
+        exercises: list.map((e) => e.name),
+      };
+    }
+
+    case "log_exercise_set": {
+      const planId = await resolvePlanIdOrActive(args.planId as string);
+      const { day } = await resolveDay(planId, args.weekNumber as number, args.dayOfWeek as number);
+      if (!day) throw new Error("Day not found");
+      const entry = await prisma.workoutEntry.findFirst({
+        where: { dayId: day.id, title: args.entryTitle as string },
+      });
+      if (!entry) throw new Error(`Entry "${args.entryTitle}" not found`);
+
+      const exercise = await prisma.exerciseEntry.findFirst({
+        where: { entryId: entry.id, name: { equals: args.exerciseName as string, mode: "insensitive" } },
+      });
+      if (!exercise) throw new Error(`Exercise "${args.exerciseName}" not found on "${entry.title}"`);
+
+      const setIndex = Number(args.setIndex);
+      if (!Number.isInteger(setIndex) || setIndex < 1) throw new Error("setIndex must be a 1-based integer");
+
+      await prisma.exerciseSet.upsert({
+        where:  { exerciseId_setIndex: { exerciseId: exercise.id, setIndex } },
+        update: {
+          reps:     args.reps     !== undefined ? Number(args.reps)     : undefined,
+          weightKg: args.weightKg !== undefined ? Number(args.weightKg) : undefined,
+          rpe:      args.rpe      !== undefined ? Number(args.rpe)      : undefined,
+          loggedAt: new Date(),
+        },
+        create: {
+          exerciseId: exercise.id,
+          setIndex,
+          reps:     args.reps     !== undefined ? Number(args.reps)     : null,
+          weightKg: args.weightKg !== undefined ? Number(args.weightKg) : null,
+          rpe:      args.rpe      !== undefined ? Number(args.rpe)      : null,
+        },
+      });
+      return { message: `Logged ${exercise.name} set ${setIndex}: ${args.reps ?? "?"} reps @ ${args.weightKg ?? "?"}kg` };
+    }
+
+    case "get_exercise_history": {
+      const limit = Math.min(Math.max(1, Number(args.limit) || 5), 20);
+      const sessions = await prisma.exerciseEntry.findMany({
+        where: {
+          name: { contains: args.exerciseName as string, mode: "insensitive" },
+          entry: { day: { week: { plan: { userId } } } },
+        },
+        orderBy: { id: "desc" },
+        take: limit,
+        include: {
+          sets: { orderBy: { setIndex: "asc" } },
+          entry: {
+            select: {
+              title: true,
+              day: {
+                select: {
+                  dayOfWeek: true, status: true, completedAt: true,
+                  week: { select: { weekNumber: true, plan: { select: { title: true, startDate: true } } } },
+                },
+              },
+            },
+          },
+        },
+      });
+
+      return {
+        exercise: args.exerciseName,
+        sessions: sessions.map((s: {
+          name: string; targetSets: number | null; targetReps: string | null;
+          targetWeightKg: number | null; targetRpe: number | null; notes: string | null;
+          sets: { setIndex: number; reps: number | null; weightKg: number | null; rpe: number | null; completed: boolean; loggedAt: Date }[];
+          entry: { title: string; day: { dayOfWeek: number; status: string; completedAt: Date | null; week: { weekNumber: number; plan: { title: string; startDate: Date | null } } } };
+        }) => ({
+          exerciseName: s.name,
+          plan: s.entry.day.week.plan.title,
+          week: s.entry.day.week.weekNumber,
+          dayOfWeek: s.entry.day.dayOfWeek,
+          entryTitle: s.entry.title,
+          dayStatus: s.entry.day.status,
+          completedAt: s.entry.day.completedAt,
+          planned: {
+            sets: s.targetSets, reps: s.targetReps,
+            weightKg: s.targetWeightKg, rpe: s.targetRpe, notes: s.notes,
+          },
+          logged: s.sets.map((set) => ({
+            set: set.setIndex, reps: set.reps, weightKg: set.weightKg,
+            rpe: set.rpe, completed: set.completed, loggedAt: set.loggedAt,
+          })),
+        })),
+      };
     }
 
     case "create_week": {

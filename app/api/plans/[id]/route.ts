@@ -22,7 +22,17 @@ export async function GET(req: NextRequest, { params }: Ctx) {
         include: {
           days: {
             orderBy: { dayOfWeek: "asc" },
-            include: { entries: { orderBy: { orderIndex: "asc" } } },
+            include: {
+              entries: {
+                orderBy: { orderIndex: "asc" },
+                include: {
+                  exercises: {
+                    orderBy: { orderIndex: "asc" },
+                    include: { sets: { orderBy: { setIndex: "asc" } } },
+                  },
+                },
+              },
+            },
           },
         },
       },

@@ -58,6 +58,10 @@ export async function GET(req: NextRequest) {
             where: { status: { not: "REJECTED" } },
             include: { activity: { select: ACTIVITY_SELECT } },
           },
+          exercises: {
+            orderBy: { orderIndex: "asc" },
+            include: { sets: { orderBy: { setIndex: "asc" } } },
+          },
         },
       },
     },

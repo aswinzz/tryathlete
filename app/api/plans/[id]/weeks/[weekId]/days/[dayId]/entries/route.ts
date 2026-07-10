@@ -37,6 +37,10 @@ export async function GET(req: NextRequest, { params }: Ctx) {
           },
         },
       },
+      exercises: {
+        orderBy: { orderIndex: "asc" },
+        include: { sets: { orderBy: { setIndex: "asc" } } },
+      },
     },
   });
   return NextResponse.json(entries);

@@ -22,6 +22,10 @@ async function ownedDay(userId: string, planId: string, weekId: string, dayId: s
             where: { status: { not: "REJECTED" } },
             include: { activity: { select: ACTIVITY_SELECT } },
           },
+          exercises: {
+            orderBy: { orderIndex: "asc" },
+            include: { sets: { orderBy: { setIndex: "asc" } } },
+          },
         },
       },
       week: { include: { plan: { select: { userId: true, id: true } } } },

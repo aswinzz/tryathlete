@@ -264,8 +264,47 @@ model WorkoutEntry {
   orderIndex  Int       @default(0)
   createdAt   DateTime  @default(now())
 
-  day   WorkoutDay         @relation(fields: [dayId], references: [id], onDelete: Cascade)
-  links PlanActivityLink[]
+  day       WorkoutDay         @relation(fields: [dayId], references: [id], onDelete: Cascade)
+  links     PlanActivityLink[]
+  exercises ExerciseEntry[]
+}
+
+// ─── Strength session structure ───────────────────────────────────────────────
+// Planned targets live on ExerciseEntry (authored by user or AI via MCP);
+// actual performance is logged per-set in ExerciseSet. The same
+// planned-vs-actual pattern will extend to interval workouts later.
+
+model ExerciseEntry {
+  id             String  @id @default(cuid())
+  entryId        String
+  name           String  // e.g. "Back Squat"
+  orderIndex     Int     @default(0)
+  targetSets     Int?
+  targetReps     String? // "8" or "8-10" — string so ranges work
+  targetWeightKg Float?
+  targetRpe      Float?  // planned effort 1–10
+  restSec        Int?
+  notes          String? // technique cues, tempo, etc.
+
+  entry WorkoutEntry  @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  sets  ExerciseSet[]
+
+  @@index([entryId])
+}
+
+model ExerciseSet {
+  id         String   @id @default(cuid())
+  exerciseId String
+  setIndex   Int      // 1-based
+  reps       Int?
+  weightKg   Float?
+  rpe        Float?   // actual effort
+  completed  Boolean  @default(true)
+  loggedAt   DateTime @default(now())
+
+  exercise ExerciseEntry @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+
+  @@unique([exerciseId, setIndex])
 }
 
 model PlanActivityLink {
