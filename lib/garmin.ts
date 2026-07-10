@@ -5,6 +5,7 @@ import { reconcileActivity } from "./planReconciler";
 import { getHRZone } from "./utils";
 import { decrypt } from "./encryption";
 import { parseDataPrefs, DEFAULT_GARMIN_PREFS, type WhoopDataPrefs } from "./whoop";
+import { absorbManualLog } from "./activityMerge";
 
 /**
  * Parse a Garmin time string (e.g. "2024-03-15 07:30:00") as UTC.
@@ -191,6 +192,10 @@ export async function syncGarminActivities(userId: string) {
     } catch {
       // HR not always available — skip silently
     }
+
+    // Absorb any manual workout log from the same session BEFORE reconciling,
+    // so the plan match sees the final merged activity.
+    try { await absorbManualLog(saved.id, userId); } catch {}
 
     // Reconcile against active workout plan (fire-and-forget, never throws)
     reconcileActivity(saved.id, userId).catch(() => {});

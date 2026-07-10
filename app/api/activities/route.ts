@@ -48,7 +48,7 @@ export async function GET(req: NextRequest) {
       take: limit + 1,
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
       select: {
-        id: true, name: true, type: true, startTime: true,
+        id: true, name: true, type: true, source: true, startTime: true,
         duration: true, distance: true, avgHeartRate: true,
         avgPace: true, elevGain: true, calories: true,
       },

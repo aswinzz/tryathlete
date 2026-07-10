@@ -48,3 +48,21 @@ export async function PATCH(
   if (updated.count === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json({ ok: true, name });
 }
+
+/**
+ * DELETE — remove an activity (exercises, sets, laps, links cascade).
+ * Intended for manually logged workouts; deleting a synced activity works
+ * too but it will reappear on the next provider sync.
+ */
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const userId = await getUserId(req);
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { id } = await params;
+  const deleted = await prisma.activity.deleteMany({ where: { id, userId } });
+  if (deleted.count === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  return NextResponse.json({ ok: true });
+}

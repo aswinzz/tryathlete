@@ -15,6 +15,7 @@ import type { RoutePoint } from "./routeUtils";
 import { downsample } from "./routeUtils";
 import { sendPushToUser } from "./push";
 import { reconcileActivity } from "./planReconciler";
+import { absorbManualLog } from "./activityMerge";
 import { parseDataPrefs } from "./whoop";
 import { getHRZone } from "./utils";
 
@@ -407,6 +408,9 @@ export async function importSingleStravaActivity(userId: string, stravaActivityI
 
   console.log(`[strava] webhook: imported ${stravaId} → activity ${created.id}`);
 
+  // Absorb any manual workout log from the same session
+  try { await absorbManualLog(created.id, userId); } catch {}
+
   // Auto-match against the active workout plan (fire-and-forget, never throws)
   reconcileActivity(created.id, userId).catch(() => {});
 
@@ -487,6 +491,9 @@ async function syncStravaActivities(userId: string, after: Date | null) {
           rawData:      JSON.stringify(act),
         },
       });
+
+      // Absorb any manual workout log from the same session
+      try { await absorbManualLog(created.id, userId); } catch {}
 
       // Auto-match against the active workout plan (fire-and-forget, never throws)
       reconcileActivity(created.id, userId).catch(() => {});

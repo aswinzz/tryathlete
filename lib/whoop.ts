@@ -13,6 +13,7 @@
 import { prisma } from "./prisma";
 import { sendPushToUser } from "./push";
 import { reconcileActivity } from "./planReconciler";
+import { absorbManualLog } from "./activityMerge";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -359,6 +360,10 @@ async function syncWhoopWorkouts(userId: string, since: Date | null = null) {
         rawData:     JSON.stringify(w),
       },
     });
+
+    // Absorb any manual workout log from the same session (sets/reps logged
+    // during the workout merge into this synced activity)
+    try { await absorbManualLog(created.id, userId); } catch {}
 
     // Auto-match against the active workout plan (fire-and-forget, never throws)
     reconcileActivity(created.id, userId).catch(() => {});
