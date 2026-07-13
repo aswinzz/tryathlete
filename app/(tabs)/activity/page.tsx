@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { ActivityList } from "./ActivityList";
+import { LogWorkoutButton } from "./LogWorkoutButton";
 
 export const dynamic = "force-dynamic";
 
@@ -33,9 +34,12 @@ export default async function ActivityPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-white">All Activities</h1>
-        <span className="text-xs text-[var(--text-3)] bg-[var(--surface-2)] px-3 py-1.5 rounded-full">
-          {totalCount} workouts
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-[var(--text-3)] bg-[var(--surface-2)] px-3 py-1.5 rounded-full">
+            {totalCount} workouts
+          </span>
+          <LogWorkoutButton />
+        </div>
       </div>
 
       {/* Empty state */}

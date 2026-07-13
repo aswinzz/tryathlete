@@ -43,6 +43,10 @@ export default async function DayDetailPage({
               },
             },
           },
+          exercises: {
+            orderBy: { orderIndex: "asc" },
+            include: { sets: { orderBy: { setIndex: "asc" } } },
+          },
         },
       },
     },

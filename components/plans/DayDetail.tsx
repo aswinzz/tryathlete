@@ -7,6 +7,7 @@ import type { WorkoutWeek, WorkoutDay, WorkoutEntry } from "@prisma/client";
 import { AddEntrySheet } from "./AddEntrySheet";
 import { ConfirmSheet } from "./ConfirmSheet";
 import { ActivityPickerSheet } from "./ActivityPickerSheet";
+import { ExercisesSection, type Exercise } from "./ExercisesSection";
 import { formatDistanceKm, formatDurationShort, formatPace } from "@/lib/utils";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -30,6 +31,7 @@ interface ActivityLink {
 
 interface EntryWithLinks extends WorkoutEntry {
   links: ActivityLink[];
+  exercises?: Exercise[];
 }
 
 type DayWithEntries = WorkoutDay & { entries: EntryWithLinks[] };
@@ -433,6 +435,20 @@ function EntryCard({ entry, isRace, isDeleting, confirmingLinkId, unlinkingLinkI
           )}
         </div>
       </div>
+
+      {/* Planned exercises — visible for strength/HIIT even when empty so the
+          athlete can add & log exercises (including substitutions) */}
+      {((entry.exercises?.length ?? 0) > 0 || entry.type === "STRENGTH" || entry.type === "HIIT") && (
+        <div className="pt-1 border-t border-[var(--border)]">
+          <div className="pt-2">
+            <ExercisesSection
+              scope={{ kind: "entry", id: entry.id }}
+              initialExercises={entry.exercises ?? []}
+              showWhenEmpty
+            />
+          </div>
+        </div>
+      )}
 
       {/* Confirmed linked activities */}
       {confirmedLinks.length > 0 && (

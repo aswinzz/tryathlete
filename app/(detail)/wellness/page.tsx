@@ -41,11 +41,16 @@ export default async function WellnessPage() {
 
   const userId = session!.user!.id!;
 
-  const whoopConn = await prisma.trackerConnection.findUnique({
-    where: { userId_provider: { userId, provider: "whoop" } },
-  });
+  const [whoopConn, garminConn] = await Promise.all([
+    prisma.trackerConnection.findUnique({
+      where: { userId_provider: { userId, provider: "whoop" } },
+    }),
+    prisma.trackerConnection.findUnique({
+      where: { userId_provider: { userId, provider: "garmin" } },
+    }),
+  ]);
 
-  if (!whoopConn) {
+  if (!whoopConn && !garminConn) {
     return (
       <div className="flex flex-col min-h-dvh">
         <div className="flex items-center justify-between px-5 pt-14 pb-5 border-b border-[var(--border)]">
@@ -59,7 +64,7 @@ export default async function WellnessPage() {
           <p className="text-4xl">💚</p>
           <p className="font-semibold text-[var(--text-2)]">No wellness data yet</p>
           <p className="text-sm text-[var(--text-3)]">
-            Connect WHOOP in Settings to sync recovery, sleep, and HRV data.
+            Connect WHOOP or Garmin in Settings to sync recovery, sleep, and HRV data.
           </p>
           <Link
             href="/settings"
@@ -73,11 +78,38 @@ export default async function WellnessPage() {
     );
   }
 
-  const records = await prisma.whoopRecovery.findMany({
+  let records = await prisma.whoopRecovery.findMany({
     where: { userId },
     orderBy: { date: "desc" },
     take: 30,
   });
+
+  // Garmin fallback — Training Readiness / Body Battery mapped into the same
+  // record shape (plus VO2 max & stress extras used by the today card).
+  if (records.length === 0 && garminConn) {
+    const garmin = await prisma.garminWellness.findMany({
+      where: { userId },
+      orderBy: { date: "desc" },
+      take: 30,
+    });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    records = garmin.map((g: any) => ({
+      id: g.id,
+      date: g.date,
+      recoveryScore: g.trainingReadiness ?? g.bodyBattery ?? null,
+      hrv: g.hrv,
+      restingHR: g.restingHR,
+      totalSleepMin: g.totalSleepMin,
+      sleepScore: g.sleepScore,
+      sleepEff: null,
+      remMin: g.remMin, deepMin: g.deepMin, lightMin: g.lightMin, awakeMin: g.awakeMin,
+      strain: null, kilojoule: null, avgHR: null, maxHR: null,
+      spo2: null, skinTemp: null, respRate: null,
+      vo2Max: g.vo2Max, vo2MaxCycling: g.vo2MaxCycling,
+      stressAvg: g.stressAvg, stressMax: g.stressMax,
+      source: "garmin",
+    }));
+  }
 
   // Only label a record "Today" if its date is actually today (UTC)
   const utcNow    = new Date();
@@ -113,7 +145,7 @@ export default async function WellnessPage() {
           <div className="flex flex-col items-center gap-3 py-16 text-center">
             <Activity size={36} className="text-[var(--text-3)]" />
             <p className="font-semibold text-[var(--text-2)]">No recovery data yet</p>
-            <p className="text-sm text-[var(--text-3)]">WHOOP is connected — sync will populate this page.</p>
+            <p className="text-sm text-[var(--text-3)]">Your tracker is connected — sync will populate this page.</p>
           </div>
         )}
 
@@ -187,6 +219,19 @@ type RecoveryRecord = Awaited<ReturnType<typeof prisma.whoopRecovery.findFirst>>
 
 function TodayCard({ record }: { record: NonNullable<RecoveryRecord> }) {
   const color = scoreColor(record.recoveryScore);
+  // Extended metrics — whichever the tracker provides (WHOOP: spo2/respRate/skinTemp,
+  // Garmin: VO2 max/stress). Mirrors the iOS wellness card.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const r = record as any;
+  const extras: { label: string; value: string }[] = [
+    r.vo2Max        != null ? { label: "VO₂ MAX",   value: Number(r.vo2Max).toFixed(1) } : null,
+    r.vo2MaxCycling != null ? { label: "VO₂ CYCLE", value: Number(r.vo2MaxCycling).toFixed(1) } : null,
+    r.stressAvg     != null ? { label: "STRESS",    value: `${r.stressAvg}` } : null,
+    r.spo2          != null ? { label: "SPO₂",      value: `${Math.round(r.spo2)}%` } : null,
+    r.respRate      != null ? { label: "RESP RATE", value: `${Number(r.respRate).toFixed(1)}/min` } : null,
+    r.skinTemp      != null ? { label: "SKIN TEMP", value: `${Number(r.skinTemp).toFixed(1)}°C` } : null,
+  ].filter(Boolean) as { label: string; value: string }[];
+
   return (
     <div className="bg-[var(--surface-2)] rounded-2xl p-5 space-y-4">
       {/* Score */}
@@ -245,6 +290,18 @@ function TodayCard({ record }: { record: NonNullable<RecoveryRecord> }) {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Extended metrics (VO2 max / stress / SpO2 / resp rate / skin temp) */}
+      {extras.length > 0 && (
+        <div className="grid grid-cols-3 gap-2">
+          {extras.map((m) => (
+            <div key={m.label} className="rounded-xl py-2.5 text-center" style={{ background: "var(--surface-3)" }}>
+              <p className="text-[13px] font-bold text-white leading-tight">{m.value}</p>
+              <p className="text-[8px] font-bold tracking-[0.08em] text-[var(--text-3)] mt-0.5">{m.label}</p>
+            </div>
+          ))}
         </div>
       )}
 

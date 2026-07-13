@@ -1,97 +1,31 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { ActivityCard } from "@/components/activity/ActivityCard";
 import { Button } from "@/components/ui/Button";
-import { Bell } from "lucide-react";
 import { SyncButton } from "@/components/dashboard/SyncButton";
-import { OverallStatsCard } from "@/components/dashboard/OverallStatsCard";
-import type { TypeTab, AllTypeStats, TypeStats } from "@/components/dashboard/OverallStatsCard";
 import Link from "next/link";
-import { getHRZone } from "@/lib/utils";
 import { RecoveryWidget } from "@/components/dashboard/RecoveryWidget";
+import { FeedWidgets } from "@/components/dashboard/FeedWidgets";
+import { RecentActivityFeed } from "@/components/dashboard/RecentActivityFeed";
+import { Greeting } from "@/components/dashboard/Greeting";
+import { LogWorkoutButton } from "@/app/(tabs)/activity/LogWorkoutButton";
 
 export const dynamic = "force-dynamic";
-
-/** Map an activity type string to one of the 5 dashboard tabs, or null if unrecognised. */
-function classifyType(type: string): TypeTab | null {
-  const t = type.toLowerCase();
-  if (t.includes("run")) return "RUNS";
-  if (t.includes("cycl") || t.includes("bike") || t.includes("ride")) return "CYCLING";
-  if (t.includes("swim")) return "SWIMMING";
-  if (t.includes("strength") || t.includes("gym") || t.includes("weight") || t.includes("functional_strength")) return "STRENGTH";
-  if (t.includes("hiit") || t.includes("crossfit") || t.includes("circuit") || t.includes("cardio") || t.includes("interval")) return "HIIT";
-  return null;
-}
-
-const EMPTY_STATS: TypeStats = {
-  count: 0, totalDistanceM: 0, totalDurationS: 0, totalCalories: 0,
-  avgPaceSpM: null, avgSpeedMps: null, avgHeartRate: null,
-};
 
 export default async function DashboardPage() {
   const session = await auth();
   const userId = session!.user!.id!;
 
-  // Recent activities for the feed
+  // Recent activities for the feed (client groups into Today / Yesterday)
   const activities = await prisma.activity.findMany({
     where: { userId },
     orderBy: { startTime: "desc" },
     take: 20,
-    include: { laps: { orderBy: { lapIndex: "asc" }, take: 1 } },
-  });
-
-  // All activities (lightweight) for overall stats aggregation
-  const allActivities = await prisma.activity.findMany({
-    where: { userId },
     select: {
-      type: true, distance: true, duration: true, calories: true,
-      avgPace: true, avgHeartRate: true,
+      id: true, name: true, type: true, startTime: true, duration: true,
+      distance: true, avgHeartRate: true, avgPace: true, elevGain: true, calories: true,
     },
   });
-
-  // Aggregate into per-tab stats
-  const buckets: Record<TypeTab, {
-    count: number; distM: number; durS: number; kcal: number;
-    paceSum: number; paceCount: number;
-    speedSum: number; speedCount: number;
-    hrSum: number; hrCount: number;
-  }> = {
-    RUNS:     { count: 0, distM: 0, durS: 0, kcal: 0, paceSum: 0, paceCount: 0, speedSum: 0, speedCount: 0, hrSum: 0, hrCount: 0 },
-    CYCLING:  { count: 0, distM: 0, durS: 0, kcal: 0, paceSum: 0, paceCount: 0, speedSum: 0, speedCount: 0, hrSum: 0, hrCount: 0 },
-    SWIMMING: { count: 0, distM: 0, durS: 0, kcal: 0, paceSum: 0, paceCount: 0, speedSum: 0, speedCount: 0, hrSum: 0, hrCount: 0 },
-    STRENGTH: { count: 0, distM: 0, durS: 0, kcal: 0, paceSum: 0, paceCount: 0, speedSum: 0, speedCount: 0, hrSum: 0, hrCount: 0 },
-    HIIT:     { count: 0, distM: 0, durS: 0, kcal: 0, paceSum: 0, paceCount: 0, speedSum: 0, speedCount: 0, hrSum: 0, hrCount: 0 },
-  };
-
-  for (const a of allActivities) {
-    const tab = classifyType(a.type);
-    if (!tab) continue;
-    const b = buckets[tab];
-    b.count++;
-    b.distM   += a.distance || 0;
-    b.durS    += a.duration;
-    b.kcal    += a.calories || 0;
-    if (a.avgPace) { b.paceSum += a.avgPace; b.paceCount++; }
-    // derive speed from pace (avgPace = s/m → speed = 1/avgPace m/s)
-    if (a.avgPace) { b.speedSum += 1 / a.avgPace; b.speedCount++; }
-    if (a.avgHeartRate) { b.hrSum += a.avgHeartRate; b.hrCount++; }
-  }
-
-  const overallStats: AllTypeStats = Object.fromEntries(
-    (Object.entries(buckets) as [TypeTab, typeof buckets[TypeTab]][]).map(([tab, b]) => [
-      tab,
-      b.count === 0 ? EMPTY_STATS : ({
-        count: b.count,
-        totalDistanceM: b.distM,
-        totalDurationS: b.durS,
-        totalCalories:  b.kcal,
-        avgPaceSpM:     b.paceCount  > 0 ? b.paceSum  / b.paceCount  : null,
-        avgSpeedMps:    b.speedCount > 0 ? b.speedSum / b.speedCount : null,
-        avgHeartRate:   b.hrCount    > 0 ? b.hrSum    / b.hrCount    : null,
-      } satisfies TypeStats),
-    ])
-  ) as AllTypeStats;
 
   const [garminConn, whoopConn, stravaConn] = await Promise.all([
     prisma.trackerConnection.findUnique({ where: { userId_provider: { userId, provider: "garmin" } } }),
@@ -99,10 +33,10 @@ export default async function DashboardPage() {
     prisma.trackerConnection.findUnique({ where: { userId_provider: { userId, provider: "strava" } } }),
   ]);
 
-  // Today's WHOOP recovery — only show if the record is actually from today
+  // Today's recovery — WHOOP first, Garmin (Training Readiness / Body Battery) fallback
   const utcToday = new Date();
   const todayStart = new Date(Date.UTC(utcToday.getUTCFullYear(), utcToday.getUTCMonth(), utcToday.getUTCDate()));
-  const todayRecovery = whoopConn
+  let todayRecovery = whoopConn
     ? await prisma.whoopRecovery.findFirst({
         where: { userId, date: { gte: todayStart } },
         orderBy: { date: "desc" },
@@ -113,35 +47,178 @@ export default async function DashboardPage() {
       })
     : null;
 
+  if (!todayRecovery && garminConn) {
+    const gCutoff = new Date(Date.now() - 48 * 60 * 60 * 1000);
+    const g = await prisma.garminWellness.findFirst({
+      where: { userId, date: { gte: gCutoff } },
+      orderBy: { date: "desc" },
+    });
+    if (g) {
+      todayRecovery = {
+        date: g.date,
+        recoveryScore: g.trainingReadiness ?? g.bodyBattery ?? null,
+        hrv: g.hrv,
+        restingHR: g.restingHR,
+        totalSleepMin: g.totalSleepMin,
+        sleepScore: g.sleepScore,
+        strain: null,
+      };
+    }
+  }
+
+  // ── Today's plan (active plan → this week → today) ──────────────────────────
+  const activePlan = await prisma.workoutPlan.findFirst({
+    where: { userId, isActive: true },
+    select: { id: true, title: true, startDate: true },
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let todayPlanDay: any = null;
+  let todayPlanHref: string | null = null;
+  if (activePlan?.startDate) {
+    const now = new Date();
+    const todayUTC = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
+    const startUTC = Date.UTC(
+      activePlan.startDate.getFullYear(), activePlan.startDate.getMonth(), activePlan.startDate.getDate()
+    );
+    const daysElapsed = Math.floor((todayUTC - startUTC) / 86_400_000);
+    if (daysElapsed >= 0) {
+      const weekNumber = Math.floor(daysElapsed / 7) + 1;
+      const jsDow = now.getDay();
+      const dayOfWeek = jsDow === 0 ? 7 : jsDow;
+      const week = await prisma.workoutWeek.findFirst({
+        where: { planId: activePlan.id, weekNumber },
+        select: { id: true },
+      });
+      if (week) {
+        todayPlanDay = await prisma.workoutDay.findFirst({
+          where: { weekId: week.id, dayOfWeek },
+          include: {
+            entries: {
+              orderBy: { orderIndex: "asc" },
+              include: { links: { where: { status: { in: ["AUTO", "MANUAL"] } }, select: { id: true } } },
+            },
+          },
+        });
+        if (todayPlanDay) {
+          todayPlanHref = `/plans/${activePlan.id}/day/${weekNumber}/${dayOfWeek}`;
+        }
+      }
+    }
+  }
+
   const name = session?.user?.name?.split(" ")[0] || "Athlete";
+
+  // Streak: consecutive Mon-start weeks with ≥1 activity (mirrors the feed API)
+  const weekStartOf = (d: Date) => {
+    const out = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const dow = out.getDay();
+    out.setDate(out.getDate() - (dow === 0 ? 6 : dow - 1));
+    return out;
+  };
+  const thisWeekStart = weekStartOf(new Date());
+  const streakWindow = new Date(thisWeekStart);
+  streakWindow.setDate(streakWindow.getDate() - 7 * 26);
+  const streakActs = await prisma.activity.findMany({
+    where: { userId, startTime: { gte: streakWindow } },
+    select: { startTime: true },
+  });
+  const activeWeeks = new Set(
+    streakActs.map((a: { startTime: Date }) =>
+      Math.floor((weekStartOf(a.startTime).getTime() - thisWeekStart.getTime()) / (7 * 86_400_000))
+    )
+  );
+  let streakWeeks = 0;
+  let cursor = activeWeeks.has(0) ? 0 : -1;
+  while (activeWeeks.has(cursor)) { streakWeeks++; cursor--; }
 
   return (
     <div className="px-5 pt-14 pb-28 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-xs text-[var(--text-2)]">Good morning,</p>
-          <h1 className="text-2xl font-bold text-white">{name} 👋</h1>
-        </div>
-        <div className="flex items-center gap-2">
+      {/* Header — greeting · streak · log workout · sync */}
+      <div className="flex items-center justify-between gap-2">
+        <Greeting name={name} />
+        <div className="flex items-center gap-2 shrink-0">
+          {streakWeeks > 1 && (
+            <span className="text-[11px] font-semibold text-white px-2.5 py-1.5 rounded-full whitespace-nowrap" style={{ background: "var(--surface-2)" }}>
+              🔥 {streakWeeks} wk streak
+            </span>
+          )}
+          <LogWorkoutButton />
           {(garminConn || whoopConn || stravaConn) && (
             <SyncButton hasGarmin={!!garminConn} hasWhoop={!!whoopConn} hasStrava={!!stravaConn} />
           )}
-          <button className="relative w-9 h-9 flex items-center justify-center rounded-full bg-[var(--surface-2)] text-[var(--text-2)]">
-            <Bell size={15} />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#FF9500]" />
-          </button>
         </div>
       </div>
 
-      {/* WHOOP Recovery widget */}
+      {/* No active plan — matches the iOS hero empty state */}
+      {!activePlan && (
+        <div className="rounded-2xl p-4 space-y-3" style={{ background: "var(--surface-1)", border: "1px solid var(--border)" }}>
+          <div className="rounded-xl py-5 text-center" style={{ background: "var(--surface-2)" }}>
+            <p className="text-sm font-semibold text-white">No training plan yet</p>
+            <p className="text-xs text-[var(--text-2)] mt-1">Create a plan to see your daily workouts here</p>
+          </div>
+          <Link
+            href="/plans"
+            className="block w-full py-3 rounded-xl text-center text-sm font-bold"
+            style={{ background: "var(--accent)", color: "#000" }}
+          >
+            Create a plan →
+          </Link>
+        </div>
+      )}
+
+      {/* Today's plan */}
+      {todayPlanDay && todayPlanHref && (
+        <Link href={todayPlanHref} className="block">
+          <div className="rounded-2xl p-4 space-y-2.5" style={{ background: "var(--surface-1)", border: "1px solid var(--border)" }}>
+            <div className="flex items-center justify-between">
+              <p className="text-[10px] font-bold tracking-[0.15em] text-[var(--text-3)]">
+                TODAY&apos;S PLAN
+                {todayPlanDay.status === "COMPLETED" && <span className="text-[var(--accent)] ml-2">✓ DONE</span>}
+              </p>
+              <span className="text-xs text-[var(--text-2)]">See details →</span>
+            </div>
+            {todayPlanDay.type === "REST" || todayPlanDay.type === "RECOVERY" ? (
+              <p className="text-sm text-[var(--text-2)]">😴 Rest day — recovery is training too</p>
+            ) : todayPlanDay.entries.length === 0 ? (
+              <p className="text-sm text-[var(--text-3)]">No workouts planned today</p>
+            ) : (
+              <div className="space-y-1.5">
+                {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                {todayPlanDay.entries.map((e: any) => (
+                  <div key={e.id} className="flex items-center gap-2.5 px-3 py-2 rounded-xl" style={{ background: "var(--surface-2)" }}>
+                    <span className="text-base">
+                      {({ RUN: "🏃", CYCLING: "🚴", SWIMMING: "🏊", STRENGTH: "🏋️", HIIT: "⚡" } as Record<string, string>)[e.type] ?? "📋"}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-semibold text-white truncate">{e.title}</p>
+                      {e.durationMin && <p className="text-[11px] text-[var(--text-3)]">{e.durationMin} min</p>}
+                    </div>
+                    {e.links.length > 0 && <span className="text-[var(--accent)] text-sm">✓</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+            {todayPlanDay.status !== "COMPLETED" &&
+              todayPlanDay.type !== "REST" && todayPlanDay.type !== "RECOVERY" &&
+              todayPlanDay.entries.length > 0 && (
+              <div className="w-full py-3 rounded-xl text-center text-sm font-bold"
+                style={{ background: "var(--accent)", color: "#000" }}>
+                View today&apos;s workout →
+              </div>
+            )}
+          </div>
+        </Link>
+      )}
+
+      {/* Recovery widget — WHOOP or Garmin */}
       <RecoveryWidget
         recovery={todayRecovery ?? null}
-        whoopConnected={!!whoopConn}
+        whoopConnected={!!whoopConn || !!garminConn}
       />
 
-      {/* Per-type overall stats */}
-      <OverallStatsCard stats={overallStats} />
+      {/* Week progress · PRs · suggested matches (live from feed API) */}
+      <FeedWidgets />
 
       {/* No activities yet */}
       {activities.length === 0 && (
@@ -159,38 +236,18 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      {/* Activity feed */}
+      {/* Recent activity — Today / Yesterday groups, matching iOS */}
       {activities.length > 0 && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-base font-bold text-white">Recent Activity</h2>
-            <Link href="/activity" className="text-xs text-[var(--text-2)] hover:text-white transition-colors">
-              See all →
-            </Link>
-          </div>
-
-          <div className="space-y-3">
-            {activities.map((act) => {
-              const zone = act.avgHeartRate ? getHRZone(act.avgHeartRate) : 2;
-              return (
-                <ActivityCard
-                  key={act.id}
-                  id={act.id}
-                  name={act.name}
-                  type={act.type}
-                  startTime={act.startTime}
-                  duration={act.duration}
-                  distance={act.distance}
-                  avgHeartRate={act.avgHeartRate}
-                  avgPace={act.avgPace}
-                  elevGain={act.elevGain}
-                  calories={act.calories}
-                  zone={zone}
-                />
-              );
-            })}
-          </div>
-        </div>
+        <RecentActivityFeed
+          /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+          activities={activities.map((a: any) => ({
+            id: a.id, name: a.name, type: a.type,
+            startTime: a.startTime.toISOString(),
+            duration: a.duration, distance: a.distance,
+            avgHeartRate: a.avgHeartRate, avgPace: a.avgPace,
+            elevGain: a.elevGain, calories: a.calories,
+          }))}
+        />
       )}
     </div>
   );

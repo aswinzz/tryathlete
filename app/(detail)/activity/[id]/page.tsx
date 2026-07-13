@@ -21,6 +21,8 @@ import { LoadDetailsButton } from "./LoadDetailsButton";
 import { RouteDisplay } from "@/components/activity/RouteDisplay";
 import { HRZoneSection } from "@/components/activity/HRZoneSection";
 import { RoutePoint } from "@/lib/routeUtils";
+import { ExercisesSection, type Exercise } from "@/components/plans/ExercisesSection";
+import { DeleteActivityButton } from "./DeleteActivityButton";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +36,13 @@ export default async function ActivityDetailPage({
 
   const activity = await prisma.activity.findFirst({
     where: { id, userId: session!.user!.id! },
-    include: { laps: { orderBy: { lapIndex: "asc" } } },
+    include: {
+      laps: { orderBy: { lapIndex: "asc" } },
+      exercises: {
+        orderBy: { orderIndex: "asc" },
+        include: { sets: { orderBy: { setIndex: "asc" } } },
+      },
+    },
   });
   // Fields added after last migration — cast via any until prisma generate runs
   const routePointsRaw: string | null = (activity as any)?.routePoints ?? null;
@@ -130,9 +138,13 @@ export default async function ActivityDetailPage({
         >
           ← Feed
         </Link>
-        <button className="text-[var(--text-2)] hover:text-white transition-colors p-2">
-          <MoreHorizontal size={20} />
-        </button>
+        {(activity as any).source === "manual" ? (
+          <DeleteActivityButton activityId={activity.id} />
+        ) : (
+          <button className="text-[var(--text-2)] hover:text-white transition-colors p-2">
+            <MoreHorizontal size={20} />
+          </button>
+        )}
       </div>
 
       {/* Sub-header */}
@@ -165,6 +177,17 @@ export default async function ActivityDetailPage({
           ))}
         </div>
       </div>
+
+      {/* Exercises — strength / ad-hoc logging (no plan needed) */}
+      {(!isEndurance || ((activity as any).exercises?.length ?? 0) > 0) && (
+        <div className="px-5 mb-6">
+          <ExercisesSection
+            scope={{ kind: "activity", id: activity.id }}
+            initialExercises={((activity as any).exercises ?? []) as Exercise[]}
+            showWhenEmpty={!isEndurance}
+          />
+        </div>
+      )}
 
       {/* Load Details — Garmin: route + laps + HR; Strava: HR stream only */}
       {isEndurance && activity.garminId && (!parsedRoutePoints || !hasLaps || !hrZonesRaw) && (
